@@ -1,0 +1,100 @@
+import { create } from 'zustand';
+import { getTaskActivity } from '../api/activityApi';
+import type { CanonicalActivity as Activity } from '../api/activityApi';
+
+interface ActivityState {
+  activitiesByTask: Record<number, Activity[]>;
+  cursorByTask: Record<number, number | null>;
+  hasMoreByTask: Record<number, boolean>;
+  loading: Record<number, boolean>;
+  error: Record<number, string | null>;
+  
+  fetchActivity: (taskId: number, limit?: number) => Promise<void>;
+  appendActivity: (taskId: number, activity: Partial<Activity> & { entity_type: string, entity_id: number, activity_type: string }) => void;
+  clearActivity: (taskId: number) => void;
+}
+
+export const useActivityStore = create<ActivityState>((set, get) => ({
+  activitiesByTask: {},
+  cursorByTask: {},
+  hasMoreByTask: {},
+  loading: {},
+  error: {},
+
+  fetchActivity: async (taskId, limit = 50) => {
+    const currentCursor = get().cursorByTask[taskId] || null;
+    
+    set((state) => ({
+      loading: { ...state.loading, [taskId]: true },
+      error: { ...state.error, [taskId]: null }
+    }));
+
+    try {
+      const response = await getTaskActivity(taskId, currentCursor, limit);
+      
+      set((state) => {
+        const existingActivities = currentCursor === null ? [] : (state.activitiesByTask[taskId] || []);
+        
+        // Filter out duplicates in case of race conditions with optimistic updates
+        const existingIds = new Set(existingActivities.map(a => a.id));
+        const newActivities = response.data.filter(a => !existingIds.has(a.id));
+
+        return {
+          activitiesByTask: {
+            ...state.activitiesByTask,
+            [taskId]: [...newActivities, ...existingActivities].sort((a, b) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
+          },
+          hasMoreByTask: {
+            ...state.hasMoreByTask,
+            [taskId]: response.meta.has_more
+          },
+          cursorByTask: {
+            ...state.cursorByTask,
+            [taskId]: response.meta.cursor ? Number(response.meta.cursor) : null
+          },
+          loading: { ...state.loading, [taskId]: false }
+        };
+      });
+    } catch (error: any) {
+      set((state) => ({
+        error: { ...state.error, [taskId]: error.message || 'Failed to fetch activity' },
+        loading: { ...state.loading, [taskId]: false }
+      }));
+    }
+  },
+
+  appendActivity: (taskId, partialActivity) => {
+    const newActivity: Activity = {
+      ...partialActivity,
+      id: partialActivity.id ?? Math.floor(Math.random() * -1000000), // Temporary negative ID
+      created_at: partialActivity.created_at ?? new Date().toISOString(),
+    } as Activity;
+
+    set((state) => {
+      const current = state.activitiesByTask[taskId] || [];
+      return {
+        activitiesByTask: {
+          ...state.activitiesByTask,
+          [taskId]: [newActivity, ...current].sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+        }
+      };
+    });
+  },
+
+  clearActivity: (taskId) => {
+    set((state) => {
+      const { [taskId]: _, ...restActivities } = state.activitiesByTask;
+      const { [taskId]: __, ...restHasMore } = state.hasMoreByTask;
+      const { [taskId]: ___, ...restCursor } = state.cursorByTask;
+      return {
+        activitiesByTask: restActivities,
+        hasMoreByTask: restHasMore,
+        cursorByTask: restCursor
+      };
+    });
+  }
+}));
