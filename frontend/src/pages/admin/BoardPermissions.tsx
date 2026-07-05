@@ -3,6 +3,7 @@ import { useAdminStore } from "../../store/adminStore";
 import { Users, Loader2, Trash2 } from "lucide-react";
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { formatUserName } from "../../utils/userHelpers";
+import { usePageTitle } from "../../hooks/usePageTitle";
 
 const BoardPermissions: React.FC = () => {
   const {
@@ -19,6 +20,8 @@ const BoardPermissions: React.FC = () => {
     isAssigningUser,
     isRemovingUser,
   } = useAdminStore();
+
+  usePageTitle("Board Permissions");
 
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
 

@@ -5,8 +5,10 @@ import { UserAvatar } from '../../components/common/UserAvatar';
 import { formatUserName } from '../../utils/userHelpers';
 import toast from 'react-hot-toast';
 import { Camera, Save, Loader2, Trash2 } from 'lucide-react';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export const MyAccount: React.FC = () => {
+  usePageTitle("My Account");
   const { user, updateUserLocally } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 

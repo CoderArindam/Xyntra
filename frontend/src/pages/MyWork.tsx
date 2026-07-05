@@ -9,6 +9,7 @@ import MyWorkToolbar from "../components/my-work/MyWorkToolbar";
 import TaskCard from "../components/TaskCard";
 import TaskDetailsModal from "../components/modals/task-details";
 import { useDebounce } from "../hooks/useDebounce";
+import { usePageTitle } from "../hooks/usePageTitle";
 import {
   deriveMyWorkSummary,
   filterMyTasks,
@@ -24,6 +25,8 @@ const MyWork: React.FC = () => {
   const isFetching = myWorkView.isFetching;
   const users = Object.values(entities.users);
   const { openTaskModal } = useUiStore();
+
+  usePageTitle("My Work");
 
   // URL State
   const searchParam = searchParams.get("search") || "";

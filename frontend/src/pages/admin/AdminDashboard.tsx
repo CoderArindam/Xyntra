@@ -2,9 +2,12 @@ import React, { useEffect } from 'react';
 import { useAdminStore } from '../../store/adminStore';
 import { Users, FolderKanban } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const AdminDashboard: React.FC = () => {
   const { users, boards, fetchUsers, fetchBoards, isFetchingUsers, isFetchingBoards } = useAdminStore();
+
+  usePageTitle("Admin Overview");
 
   useEffect(() => {
     fetchUsers();

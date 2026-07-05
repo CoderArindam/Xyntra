@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { 
   getSessions, 
   signOutOtherSessions, 
@@ -424,6 +425,8 @@ const PlaceholderSection = ({ title, description }: { title: string, description
 export const Security: React.FC = () => {
   const { user } = useAuthStore();
   const [policy, setPolicy] = useState<any>(null);
+
+  usePageTitle("Security");
 
   useEffect(() => {
     getPasswordPolicy().then(setPolicy).catch(console.error);

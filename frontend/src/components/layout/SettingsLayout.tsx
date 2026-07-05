@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../../store/authStore';
 import { User, Building2, Palette, Bell, Shield, Key, CreditCard, Keyboard, Boxes } from 'lucide-react';
 
 const SETTINGS_TABS = [

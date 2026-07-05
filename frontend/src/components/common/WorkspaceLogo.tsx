@@ -4,6 +4,7 @@ interface WorkspaceLogoProps {
   name?: string | null;
   logoUrl?: string | null;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  variant?: 'square' | 'rounded' | 'circle';
   className?: string;
 }
 
@@ -21,16 +22,23 @@ export const WorkspaceLogo: React.FC<WorkspaceLogoProps> = ({
   name = 'Workspace', 
   logoUrl, 
   size = 'md',
+  variant = 'rounded',
   className = '' 
 }) => {
   const sizeClasses = {
-    sm: 'w-6 h-6 text-xs',
+    sm: 'w-6 h-6 text-[10px]',
     md: 'w-8 h-8 text-sm',
     lg: 'w-12 h-12 text-base',
     xl: 'w-16 h-16 text-lg'
   };
+  
+  const variantClasses = {
+    square: 'rounded-none',
+    rounded: 'rounded-md',
+    circle: 'rounded-full'
+  };
 
-  const baseClasses = `flex-shrink-0 flex items-center justify-center rounded bg-brand-primary text-white font-semibold ${sizeClasses[size]} ${className}`;
+  const baseClasses = `flex-shrink-0 flex items-center justify-center bg-brand-primary text-white font-semibold ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
 
   if (logoUrl) {
     const baseUrl = import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '') : '';

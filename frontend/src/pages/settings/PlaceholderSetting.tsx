@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 interface PlaceholderSettingProps {
   title: string;
@@ -7,6 +8,8 @@ interface PlaceholderSettingProps {
 }
 
 export const PlaceholderSetting: React.FC<PlaceholderSettingProps> = ({ title, description, Icon }) => {
+  usePageTitle(title);
+
   return (
     <div className="flex flex-col h-full items-center justify-center text-center mt-20 animate-in fade-in duration-500">
       <div className="w-24 h-24 bg-brand-surface border border-brand-border rounded-2xl flex items-center justify-center mb-6 shadow-sm">

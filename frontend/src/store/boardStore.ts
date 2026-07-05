@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import { getBoards, createBoard, deleteBoard, type Board } from '../api/boardsApi';
 import toast from 'react-hot-toast';
@@ -7,7 +8,7 @@ interface BoardState {
   isFetching: boolean;
   isSubmitting: boolean;
   fetchBoards: () => Promise<void>;
-  createNewBoard: (name: string) => Promise<void>;
+  createNewBoard: (boardData: Partial<Board>) => Promise<Board | undefined>;
   removeBoard: (boardId: number) => Promise<void>;
 }
 
@@ -29,16 +30,18 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     }
   },
 
-  createNewBoard: async (name: string) => {
-    if (!name.trim()) return;
+  createNewBoard: async (boardData: Partial<Board>) => {
+    if (!boardData.name?.trim()) return;
     set({ isSubmitting: true });
     try {
-      const newBoard = await createBoard(name);
+      const newBoard = await createBoard(boardData);
       set({ boards: [...get().boards, newBoard] });
       toast.success('Project created successfully');
-    } catch (error) {
+      return newBoard;
+    } catch (error: any) {
       console.error('Failed to create board:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to create project');
+      toast.error(error.response?.data?.detail || error.message || 'Failed to create project');
+      throw error;
     } finally {
       set({ isSubmitting: false });
     }
@@ -55,3 +58,13 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     }
   }
 }));
+
+export const useActiveBoards = () => {
+  const boards = useBoardStore(state => state.boards);
+  return useMemo(() => boards.filter(b => !b.archived_at), [boards]);
+};
+
+export const useArchivedBoards = () => {
+  const boards = useBoardStore(state => state.boards);
+  return useMemo(() => boards.filter(b => b.archived_at), [boards]);
+};

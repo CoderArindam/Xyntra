@@ -3,8 +3,10 @@ import { Palette, Monitor, Moon, Sun, CheckCircle } from 'lucide-react';
 import { usePreferencesStore } from '../../store/preferencesStore';
 import type { ThemeType } from '../../api/preferences';
 import toast from 'react-hot-toast';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const Appearance: React.FC = () => {
+  usePageTitle('Appearance');
   const { preferences, fetchPreferences, updatePreferences, isLoading } = usePreferencesStore();
 
   useEffect(() => {
@@ -58,12 +60,12 @@ const Appearance: React.FC = () => {
   return (
     <div className="max-w-4xl space-y-8 animate-in fade-in duration-300">
       <div>
-        <h1 className="text-2xl font-semibold text-brand-text flex items-center gap-2">
-          <Palette className="w-6 h-6 text-brand-primary" />
+        <h1 className="text-2xl font-bold tracking-tight text-brand-text flex items-center gap-2">
+          <Palette className="text-brand-primary" size={24} />
           Appearance
         </h1>
         <p className="mt-2 text-sm text-brand-text-muted">
-          Customize how ProSync looks on your device.
+          Customize how your workspace looks on your device.
         </p>
       </div>
 

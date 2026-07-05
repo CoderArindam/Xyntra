@@ -4,6 +4,9 @@ import { useAuthStore } from '../../store/authStore';
 import { Trash2, Loader2, X, AlertTriangle, Users, Mail } from 'lucide-react';
 import { UserAvatar } from '../../components/common/UserAvatar';
 import { formatUserName } from '../../utils/userHelpers';
+import { usePageTitle } from '../../hooks/usePageTitle';
+import WorkspaceLogo from '../../components/common/WorkspaceLogo';
+import { useOrganizationStore } from '../../store/organizationStore';
 
 const UsersManagement: React.FC = () => {
   const { 
@@ -20,6 +23,9 @@ const UsersManagement: React.FC = () => {
   } = useAdminStore();
   
   const { user: currentUser } = useAuthStore();
+  const { profile } = useOrganizationStore();
+
+  usePageTitle("Users & Invitations");
 
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -232,6 +238,18 @@ const UsersManagement: React.FC = () => {
             </div>
             
             <form onSubmit={handleInviteUser} className="p-6 flex flex-col gap-5">
+              <div className="flex flex-col items-center text-center mb-2">
+                <WorkspaceLogo name={profile?.name} logoUrl={profile?.logo_url} size="xl" variant="rounded" className="mb-3 shadow-sm" />
+                <h3 className="text-lg font-semibold text-brand-text">{profile?.name || 'Workspace'}</h3>
+                {newEmail ? (
+                  <p className="text-sm text-brand-text-muted mt-1">
+                    You're inviting <span className="font-medium text-brand-text">{newEmail}</span> to {profile?.name || 'Workspace'} as <span className="font-medium text-brand-text capitalize">{newRole.toLowerCase()}</span>
+                  </p>
+                ) : (
+                  <p className="text-sm text-brand-text-muted mt-1">Invite a new member to join your workspace</p>
+                )}
+              </div>
+
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-semibold text-brand-text">Email Address</label>
                 <input
@@ -253,6 +271,23 @@ const UsersManagement: React.FC = () => {
                   <option value="MEMBER" className="text-black">Member</option>
                   <option value="MANAGER" className="text-black">Manager</option>
                 </select>
+                
+                <div className="mt-2 p-3 bg-brand-surface-low border border-brand-border rounded-lg text-sm text-brand-text-muted">
+                  <p className="font-medium text-brand-text mb-1">Permissions Preview</p>
+                  {newRole === 'MANAGER' ? (
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Can create projects</li>
+                      <li>Can invite members</li>
+                      <li>Can edit tasks</li>
+                    </ul>
+                  ) : (
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Can view assigned projects</li>
+                      <li>Can update assigned tasks</li>
+                      <li>Cannot invite members</li>
+                    </ul>
+                  )}
+                </div>
               </div>
 
               <div className="mt-2 flex gap-3 justify-end">

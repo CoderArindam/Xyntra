@@ -1,34 +1,50 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuthStore } from '../../store/authStore';
-import { UserAvatar } from '../common/UserAvatar';
-import { Settings, User, LogOut, HelpCircle, Command, Building2 } from 'lucide-react';
-import { formatUserName } from '../../utils/userHelpers';
+import React, { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useAuthStore } from "../../store/authStore";
+import { UserAvatar } from "../common/UserAvatar";
+import {
+  Settings,
+  User,
+  LogOut,
+  HelpCircle,
+  Command,
+  Building2,
+} from "lucide-react";
+import { formatUserName } from "../../utils/userHelpers";
 
-export const UserAvatarDropdown: React.FC = () => {
+interface UserAvatarDropdownProps {
+  isSidebarCollapsed?: boolean;
+}
+
+export const UserAvatarDropdown: React.FC<UserAvatarDropdownProps> = ({
+  isSidebarCollapsed = false,
+}) => {
   const { user, logout } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false);
+      if (event.key === "Escape") setIsOpen(false);
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleEscape);
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEscape);
     }
-    
+
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
     };
   }, [isOpen]);
 
@@ -37,16 +53,14 @@ export const UserAvatarDropdown: React.FC = () => {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <UserAvatar 
-        user={user} 
-        size="md" 
-        onClick={toggleDropdown} 
+      <UserAvatar
+        user={user}
+        size={isSidebarCollapsed ? "sm" : "md"}
+        onClick={toggleDropdown}
       />
 
       {isOpen && (
-        <div 
-          className="absolute right-0 mt-2 w-64 bg-brand-surface rounded-xl shadow-xl border border-brand-border z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"
-        >
+        <div className="absolute left-0 bottom-full mb-2 w-64 bg-brand-surface rounded-xl shadow-xl border border-brand-border z-50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
           {/* Header Info */}
           <div className="px-4 py-3 border-b border-brand-border bg-brand-surface-low">
             <p className="text-sm font-semibold text-brand-text truncate">
@@ -57,26 +71,25 @@ export const UserAvatarDropdown: React.FC = () => {
             </p>
           </div>
 
-          {/* Links */}
-          <div className="py-2">
-            <Link 
-              to="/settings/account" 
+          <div>
+            {/* <Link
+              to="/settings/account"
               onClick={closeDropdown}
               className="flex items-center gap-3 px-4 py-2 text-sm text-brand-text hover:bg-brand-surface-low transition-colors"
             >
               <User size={16} className="text-brand-text-muted" />
               Profile
-            </Link>
-            <Link 
-              to="/settings/account" 
+            </Link> */}
+            {/* <Link
+              to="/settings/account"
               onClick={closeDropdown}
               className="flex items-center gap-3 px-4 py-2 text-sm text-brand-text hover:bg-brand-surface-low transition-colors"
             >
               <Settings size={16} className="text-brand-text-muted" />
               Settings
-            </Link>
+            </Link> */}
 
-            {user?.role === 'SUPER_ADMIN' && (
+            {/* {user?.role === 'SUPER_ADMIN' && (
               <Link 
                 to="/settings/organization" 
                 onClick={closeDropdown}
@@ -85,9 +98,9 @@ export const UserAvatarDropdown: React.FC = () => {
                 <Building2 size={16} className="text-brand-text-muted" />
                 My Organization
               </Link>
-            )}
+            )} */}
           </div>
-
+          {/* 
           <div className="py-2 border-t border-brand-border">
             <Link 
               to="/settings/keyboard-shortcuts" 
@@ -105,12 +118,15 @@ export const UserAvatarDropdown: React.FC = () => {
               <HelpCircle size={16} className="text-brand-text-muted" />
               Help
             </a>
-          </div>
+          </div> */}
 
           <div className="py-2 border-t border-brand-border">
-            <button 
-              onClick={() => { closeDropdown(); logout(); }}
-              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-brand-primary hover:bg-brand-surface-low transition-colors"
+            <button
+              onClick={() => {
+                closeDropdown();
+                logout();
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-brand-primary hover:bg-brand-surface-low transition-colors cursor-pointer"
             >
               <LogOut size={16} />
               Sign Out

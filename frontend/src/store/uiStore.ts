@@ -11,6 +11,10 @@ interface UiState {
   isCreateTaskModalOpen: boolean;
   openCreateTaskModal: () => void;
   closeCreateTaskModal: () => void;
+  pageTitle: string;
+  setPageTitle: (title: string) => void;
+  isSidebarCollapsed: boolean;
+  toggleSidebar: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -18,6 +22,8 @@ export const useUiStore = create<UiState>((set) => ({
   isTaskModalOpen: false,
   isCreateProjectModalOpen: false,
   isCreateTaskModalOpen: false,
+  pageTitle: '',
+  isSidebarCollapsed: localStorage.getItem('kanban-sidebar-collapsed') === 'true',
 
   openTaskModal: (taskId) => set({ selectedTaskId: taskId, isTaskModalOpen: true }),
   closeTaskModal: () => set({ selectedTaskId: null, isTaskModalOpen: false }),
@@ -27,4 +33,11 @@ export const useUiStore = create<UiState>((set) => ({
 
   openCreateTaskModal: () => set({ isCreateTaskModalOpen: true }),
   closeCreateTaskModal: () => set({ isCreateTaskModalOpen: false }),
+
+  setPageTitle: (title) => set({ pageTitle: title }),
+  toggleSidebar: () => set((state) => {
+    const newState = !state.isSidebarCollapsed;
+    localStorage.setItem('kanban-sidebar-collapsed', String(newState));
+    return { isSidebarCollapsed: newState };
+  }),
 }));
