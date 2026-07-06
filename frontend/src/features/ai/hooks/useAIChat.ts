@@ -73,38 +73,61 @@ export function useAIChat() {
 
       if (!reader) throw new Error('No reader available');
 
+      let buffer = '';
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
+        buffer += decoder.decode(value, { stream: true });
         
-        const lines = chunk.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.substring(6);
-            if (dataStr === '[DONE]') break;
-            
-            try {
-              const data = JSON.parse(dataStr);
-              if (data.error || data.type === 'error' || data.type === 'execution_failed') {
-                setError(data.error || 'Execution failed');
-              }
+        while (buffer.includes('\n\n')) {
+          const splitIndex = buffer.indexOf('\n\n');
+          const eventStr = buffer.slice(0, splitIndex);
+          buffer = buffer.slice(splitIndex + 2);
+          
+          const lines = eventStr.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.substring(6);
+              if (dataStr === '[DONE]') break;
               
-              // Handle execution content
-              if (data.content && (data.type === undefined || data.type === 'content' || data.type === 'assistant_message_chunk')) {
-                updateLastMessage(data.content);
+              try {
+                const data = JSON.parse(dataStr);
+                if (data.error || data.type === 'error') {
+                  setError(data.error || 'Execution failed');
+                }
+                
+                // Handle execution content
+                if (data.content && (data.type === undefined || data.type === 'content' || data.type === 'assistant_message_chunk')) {
+                  updateLastMessage(data.content);
+                }
+                
+                // Save event to metadata for rendering the timeline/confirmation
+                if (data.v && data.type) {
+                  const prevMetadata = useAIStore.getState().messages.find(m => m.id === assistantMessageId)?.metadata || {};
+                  
+                  let executionStatus = prevMetadata.executionStatus || 'CREATED';
+                  
+                  if (data.type === 'execution_result' && data.result?.status) {
+                      executionStatus = data.result.status;
+                  } else if (data.type === 'error' || data.type === 'execution_failed') {
+                      executionStatus = 'FAILED';
+                  } else if (data.type === 'execution_cancelled') {
+                      executionStatus = 'CANCELLED';
+                  } else if (data.type === 'confirmation_required') {
+                      executionStatus = 'WAITING_FOR_CONFIRMATION';
+                  }
+                  
+                  updateLastMessageMetadata({
+                     latestEvent: data,
+                     events: [...(prevMetadata.events || []), data],
+                     executionStatus: executionStatus
+                  });
+                }
+              } catch (e) {
+                // Gracefully ignore parse errors
               }
-              
-              // Save event to metadata for rendering the timeline/confirmation
-              if (data.v && data.type) {
-                updateLastMessageMetadata({
-                   latestEvent: data,
-                   events: [...(useAIStore.getState().messages.find(m => m.id === assistantMessageId)?.metadata?.events || []), data]
-                });
-              }
-            } catch (e) {
-              // Gracefully ignore parse errors
             }
           }
         }

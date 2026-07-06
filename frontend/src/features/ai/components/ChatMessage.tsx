@@ -59,12 +59,33 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             )}
             
             {/* Confirmation Card */}
-            {!isUser && message.metadata?.latestEvent?.type === 'confirmation_required' && (
+            {!isUser && message.metadata?.executionStatus === 'WAITING_FOR_CONFIRMATION' && message.metadata?.latestEvent?.plan && (
               <ConfirmationCard 
                 plan={message.metadata.latestEvent.plan} 
                 reason={message.metadata.latestEvent.reason} 
                 messageId={message.id}
               />
+            )}
+            
+            {/* Cancelled State */}
+            {!isUser && message.metadata?.executionStatus === 'CANCELLED' && (
+              <div className="mt-3 text-yellow-700 text-sm font-medium border border-yellow-200 bg-yellow-50/50 p-3 rounded-lg flex items-center gap-2">
+                ⚠️ Execution was cancelled.
+              </div>
+            )}
+            
+            {/* Partially Completed State */}
+            {!isUser && message.metadata?.executionStatus === 'PARTIALLY_COMPLETED' && (
+              <div className="mt-3 text-orange-700 text-sm font-medium border border-orange-200 bg-orange-50/50 p-3 rounded-lg flex items-center gap-2">
+                ⚠️ Execution completed partially. Some steps failed or were skipped.
+              </div>
+            )}
+            
+            {/* Failed State */}
+            {!isUser && message.metadata?.executionStatus === 'FAILED' && (
+              <div className="mt-3 text-red-700 text-sm font-medium border border-red-200 bg-red-50/50 p-3 rounded-lg flex items-center gap-2">
+                ❌ Execution failed to complete.
+              </div>
             )}
           </div>
         </div>

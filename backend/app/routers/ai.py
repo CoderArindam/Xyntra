@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from app.database.connection import get_db_connection
 from app.auth.dependencies import get_current_user
 from app.schemas.ai import AIChatRequest
-from app.services.ai_service import AIService
+from app.services.ai_service import AIService, check_rate_limit
 from app.config.config import settings
 
 router = APIRouter(
@@ -22,6 +22,8 @@ async def chat_endpoint(
 ):
     if not settings.AI_ENABLED:
         raise HTTPException(status_code=403, detail="AI features are disabled.")
+        
+    check_rate_limit(current_user["id"])
         
     ai_service = AIService(conn)
     request_id = str(uuid.uuid4())

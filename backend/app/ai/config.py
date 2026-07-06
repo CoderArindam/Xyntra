@@ -27,4 +27,6 @@ def get_provider_api_key(provider: str) -> str | None:
         return settings.GEMINI_API_KEY
     elif provider == "azure":
         return settings.AZURE_OPENAI_KEY
+    elif provider == "puter":
+        return settings.PUTER_API_KEY
     return None

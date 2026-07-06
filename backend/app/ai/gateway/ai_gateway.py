@@ -8,7 +8,12 @@ from app.ai.exceptions import AIError, ProviderError, ParsingError
 from app.ai.providers.base import AIProvider
 from app.ai.providers.openai import OpenAIProvider
 from app.ai.providers.gemini import GeminiProvider
-from app.ai.telemetry.tracker import TelemetryEvent
+from app.ai.providers.puter import PuterProvider
+from app.ai.telemetry.context import Span, TraceContext
+from app.ai.telemetry.bus import telemetry_bus
+from app.ai.telemetry.events import EventType
+import time
+import json
 
 logger = logging.getLogger("ai.gateway")
 
@@ -29,6 +34,8 @@ class AIGateway:
             return OpenAIProvider(api_key=api_key, model=self.model_name)
         elif self.provider_name.lower() == "gemini":
             return GeminiProvider(api_key=api_key, model=self.model_name)
+        elif self.provider_name.lower() == "puter":
+            return PuterProvider(api_key=api_key, model=self.model_name)
         else:
             # Fallback
             return GeminiProvider(api_key=api_key, model=self.model_name)
@@ -41,7 +48,7 @@ class AIGateway:
         if not user_has_permission:
             raise AIError("User does not have permission to use AI features.")
 
-    def execute_prompt(
+    async def execute_prompt(
         self,
         messages: List[Dict[str, Any]],
         org_ai_enabled: bool,
@@ -53,31 +60,15 @@ class AIGateway:
         organization_id: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> Any:
-        """
-        Executes a prompt against the configured provider, tracking telemetry and validating output.
-        """
         self._check_feature_flags(org_ai_enabled, user_has_permission)
 
-        telemetry = TelemetryEvent(
-            provider=self.provider_name,
-            model=self.model_name,
-            workflow_id=workflow_id,
-            request_id=request_id,
-            organization_id=organization_id,
-            user_id=user_id,
-        )
-
-        retries = 0
-        max_retries = settings.AI_MAX_RETRIES
-
-        while retries <= max_retries:
-            try:
-                # Add tools tracking to telemetry if applicable
-                if tools:
-                    telemetry.add_tool_call()
-
-                # Call provider
-                response = self.provider.generate(
+        with Span("LLM Call", "AIGateway") as span:
+            span.metadata["provider"] = self.provider_name
+            span.metadata["model"] = self.model_name
+            span.metadata["workflow_id"] = workflow_id
+            
+            async def do_call():
+                response = await self.provider.generate(
                     messages=messages,
                     temperature=settings.AI_TEMPERATURE,
                     max_tokens=settings.AI_MAX_TOKENS,
@@ -87,50 +78,65 @@ class AIGateway:
                 content = response.get("content")
                 usage = response.get("usage", {})
                 
-                # Structured output validation
+                span.metadata["prompt_tokens"] = usage.get("prompt_tokens", 0)
+                span.metadata["completion_tokens"] = usage.get("completion_tokens", 0)
+                span.metadata["total_tokens"] = usage.get("total_tokens", 0)
+                
+                TraceContext.increment_metric("total_llm_calls")
+                TraceContext.increment_metric("total_tokens", usage.get("total_tokens", 0))
+                
                 if response_schema and content:
                     try:
-                        # In reality, the LLM might return JSON string, so we'd parse it.
-                        # For Phase 1 we assume the mock/SDK handles json.loads if structured.
-                        # Mocking validation here:
-                        import json
                         try:
                             parsed_json = json.loads(content)
                             validated_output = response_schema.model_validate(parsed_json)
                         except json.JSONDecodeError:
-                            # if not JSON, wrap it for testing or raise
-                            raise ValueError("Response is not valid JSON.")
-                    except (ValidationError, ValueError) as e:
-                        if retries < max_retries:
-                            retries += 1
-                            telemetry.add_retry()
-                            # Retry logic with repair prompt would go here
-                            messages.append({"role": "assistant", "content": content})
-                            messages.append({"role": "user", "content": f"Failed to parse JSON. Error: {e}. Please fix and return valid JSON."})
-                            continue
-                        else:
-                            telemetry.record_failure("ParsingError")
-                            raise ParsingError(f"Failed to parse LLM output: {str(e)}")
-                else:
-                    validated_output = content
-
-                # Record Success
-                telemetry.record_success(
-                    prompt_tokens=usage.get("prompt_tokens", 0),
-                    completion_tokens=usage.get("completion_tokens", 0),
-                    estimated_cost=0.0 # Calculate based on model later
-                )
+                            clean_content = content.strip()
+                            if clean_content.startswith("```json"):
+                                clean_content = clean_content[7:]
+                            elif clean_content.startswith("```"):
+                                clean_content = clean_content[3:]
+                            if clean_content.endswith("```"):
+                                clean_content = clean_content[:-3]
+                            
+                            try:
+                                parsed_json = json.loads(clean_content.strip())
+                            except json.JSONDecodeError:
+                                # Advanced repair: extract everything between first { and last }
+                                start = clean_content.find('{')
+                                end = clean_content.rfind('}')
+                                if start != -1 and end != -1 and end > start:
+                                    repaired = clean_content[start:end+1]
+                                    parsed_json = json.loads(repaired)
+                                else:
+                                    raise
+                                    
+                            validated_output = response_schema.model_validate(parsed_json)
+                            
+                        return validated_output
+                    except ValidationError as ve:
+                        raise ParsingError(f"Failed to parse LLM output: Schema validation failed. {str(ve)}", content=content)
+                    except Exception as pe:
+                        raise ParsingError(f"Failed to parse LLM output: Response is not valid JSON. {str(pe)}", content=content)
+                        
+                return response
                 
-                return validated_output
+            def on_parsing_error(e: ParsingError):
+                content = getattr(e, "content", "")
+                messages.append({"role": "assistant", "content": content})
+                messages.append({"role": "user", "content": f"Your last response was not valid according to the schema. Please fix it. Error: {str(e)}"})
+                
+            from app.ai.gateway.retries import RetryPolicy
+            policy = RetryPolicy()
+            return await policy.execute_async(
+                func=do_call,
+                request_id=request_id,
+                span_id=span.span_id,
+                parent_span_id=span.parent_span_id,
+                on_parsing_error=on_parsing_error
+            )
 
-            except ProviderError as e:
-                telemetry.record_failure(str(e))
-                raise
-            except Exception as e:
-                telemetry.record_failure(str(e))
-                raise AIError(f"Unexpected AI execution error: {str(e)}")
-
-    def stream_prompt(
+    async def stream_prompt(
         self,
         messages: List[Dict[str, Any]],
         org_ai_enabled: bool,
@@ -138,44 +144,28 @@ class AIGateway:
         tools: Optional[List[Dict[str, Any]]] = None,
         workflow_id: Optional[str] = None,
         request_id: Optional[str] = None,
-        conversation_id: Optional[str] = None,
         organization_id: Optional[str] = None,
         user_id: Optional[str] = None,
-    ):
-        """
-        Streams a prompt against the configured provider.
-        Yields chunks, handles telemetry and tools.
-        """
+    ) -> Any:
         self._check_feature_flags(org_ai_enabled, user_has_permission)
-
-        telemetry = TelemetryEvent(
-            provider=self.provider_name,
-            model=self.model_name,
-            workflow_id=workflow_id,
-            request_id=request_id,
-            conversation_id=conversation_id,
-            organization_id=organization_id,
-            user_id=user_id,
-        )
-
-        try:
-            if tools:
-                telemetry.add_tool_call()
-
-            stream_gen = self.provider.stream(
-                messages=messages,
-                temperature=settings.AI_TEMPERATURE,
-                max_tokens=settings.AI_MAX_TOKENS,
-                tools=tools
-            )
+        
+        with Span("LLM Stream", "AIGateway") as span:
+            span.metadata["provider"] = self.provider_name
+            span.metadata["model"] = self.model_name
+            span.metadata["workflow_id"] = workflow_id
             
-            # Since stream is a generator, we yield from it, but we can't record success until it finishes.
-            # We will yield chunks and when done, record success.
-            for chunk in stream_gen:
-                yield chunk
-            
-            telemetry.record_success(prompt_tokens=0, completion_tokens=0, estimated_cost=0.0)
-            
-        except Exception as e:
-            telemetry.record_failure(str(e))
-            raise AIError(f"Unexpected AI streaming error: {str(e)}")
+            try:
+                stream_gen = self.provider.stream(
+                    messages=messages,
+                    temperature=settings.AI_TEMPERATURE,
+                    max_tokens=settings.AI_MAX_TOKENS,
+                    tools=tools
+                )
+                
+                TraceContext.increment_metric("total_llm_calls")
+                
+                async for chunk in stream_gen:
+                    yield chunk
+                    
+            except ProviderError as e:
+                raise e

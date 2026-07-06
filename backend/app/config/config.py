@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     AZURE_OPENAI_KEY: Optional[str] = None
+    PUTER_API_KEY: Optional[str] = None
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()

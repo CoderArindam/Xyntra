@@ -16,17 +16,20 @@ class PlanValidator:
         """
         Validates the plan. Returns True if valid, raises ValueError if invalid.
         """
-        if not plan or not plan.steps:
-            raise ValueError("Execution plan is empty or missing steps.")
-            
-        tool_actions = [tool.action for tool in available_tools if hasattr(tool, 'action') and tool.action]
-        tool_names = [tool.name for tool in available_tools]
-        
-        for step in plan.steps:
-            action = step.action
-            if action not in tool_actions and action not in tool_names:
-                raise ValueError(f"Plan step '{step.id}' contains unsupported action: '{action}'")
+        from app.ai.telemetry.context import Span
+        with Span("Validate Plan", "PlanValidator") as span:
+            if not plan or not plan.steps:
+                raise ValueError("Execution plan is empty or missing steps.")
                 
-            # Basic argument validation could be added here
+            tool_actions = [tool.action for tool in available_tools if hasattr(tool, 'action') and tool.action]
+            tool_names = [tool.name for tool in available_tools]
             
-        return True
+            for step in plan.steps:
+                action = step.action
+                if action not in tool_actions and action not in tool_names:
+                    raise ValueError(f"Plan step '{step.id}' contains unsupported action: '{action}'")
+                    
+                # Basic argument validation could be added here
+            
+            span.metadata["steps_validated"] = len(plan.steps)
+            return True

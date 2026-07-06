@@ -11,6 +11,8 @@ class PromptRegistry:
     e.g. workspace_assistant/system.v1.md
     """
 
+    _cache = {}
+
     @staticmethod
     def get_prompt(agent_name: str, prompt_name: str, version: Optional[str] = None) -> str:
         """
@@ -18,13 +20,20 @@ class PromptRegistry:
         (For Phase 1, we assume version is provided or defaults to 'v1').
         """
         version = version or "v1"
+        cache_key = f"{agent_name}:{prompt_name}:{version}"
+        
+        if cache_key in PromptRegistry._cache:
+            return PromptRegistry._cache[cache_key]
+            
         filepath = os.path.join(PROMPTS_DIR, agent_name, f"{prompt_name}.{version}.md")
         
         if not os.path.exists(filepath):
             raise AIError(f"Prompt not found: {agent_name}/{prompt_name}.{version}.md")
             
         with open(filepath, 'r', encoding='utf-8') as f:
-            return f.read()
+            content = f.read()
+            PromptRegistry._cache[cache_key] = content
+            return content
 
     @staticmethod
     def render_prompt(agent_name: str, prompt_name: str, context: dict, version: Optional[str] = None) -> str:

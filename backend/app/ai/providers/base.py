@@ -9,7 +9,7 @@ class AIProvider(ABC):
         self.model = model
 
     @abstractmethod
-    def generate(
+    async def generate(
         self,
         messages: List[Dict[str, Any]],
         temperature: float = 0.0,
@@ -24,7 +24,7 @@ class AIProvider(ABC):
         pass
 
     @abstractmethod
-    def stream(
+    async def stream(
         self,
         messages: List[Dict[str, Any]],
         temperature: float = 0.0,

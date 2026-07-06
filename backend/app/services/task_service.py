@@ -11,6 +11,24 @@ class TaskService:
     def __init__(self, conn: asyncpg.Connection):
         self.conn = conn
 
+    async def get_task(self, task_id: int, current_user: dict) -> CanonicalTaskResponse:
+        try:
+            row = await self.conn.fetchrow("SELECT * FROM v_tasks_canonical WHERE id = $1", task_id)
+            if not row:
+                raise HTTPException(status_code=404, detail="Task not found")
+                
+            board_id = row["board_id"]
+            has_access = await self.conn.fetchval("SELECT can_view_board($1, $2)", current_user["id"], board_id)
+            if not has_access:
+                raise HTTPException(status_code=403, detail="Task not found or access denied")
+                
+            return CanonicalTaskResponse(**dict(row))
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting task: {e}")
+            raise HTTPException(status_code=400, detail="An unexpected error occurred")
+
     async def create_task(self, task_in: TaskCreate, current_user: dict) -> CanonicalTaskResponse:
         role = current_user.get("role", "MEMBER")
         if role not in ("MANAGER", "SUPER_ADMIN"):

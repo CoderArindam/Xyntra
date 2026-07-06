@@ -12,7 +12,7 @@ class GeminiProvider(AIProvider):
         super().__init__(api_key, model)
         if not self.api_key:
             raise AuthenticationError("Gemini API key is missing.")
-        genai.configure(api_key=self.api_key)
+        genai.configure(api_key=self.api_key, transport="rest")
         self.client = genai.GenerativeModel(self.model)
 
     def _convert_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -99,7 +99,7 @@ class GeminiProvider(AIProvider):
             })
         return [{"function_declarations": func_decls}]
 
-    def generate(
+    async def generate(
         self,
         messages: List[Dict[str, Any]],
         temperature: float = 0.0,
@@ -129,9 +129,11 @@ class GeminiProvider(AIProvider):
         generation_config = genai.types.GenerationConfig(**config_kwargs)
 
         try:
-            response = model.generate_content(
+            from google.api_core import retry
+            response = await model.generate_content_async(
                 contents=history,
-                generation_config=generation_config
+                generation_config=generation_config,
+                request_options={"retry": retry.Retry(predicate=lambda e: False), "timeout": 15.0} if hasattr(genai.types, "RequestOptions") else None
             )
             
             content = ""
@@ -160,7 +162,7 @@ class GeminiProvider(AIProvider):
         except Exception as e:
             raise ProviderError(f"Gemini API Error: {str(e)}")
 
-    def stream(
+    async def stream(
         self,
         messages: List[Dict[str, Any]],
         temperature: float = 0.0,
@@ -186,14 +188,14 @@ class GeminiProvider(AIProvider):
 
         try:
             from google.api_core import retry
-            response = model.generate_content(
+            response = await model.generate_content_async(
                 contents=history,
                 generation_config=generation_config,
                 stream=True,
-                request_options={"retry": retry.Retry(initial=1.0, maximum=1.0, multiplier=1.0, deadline=2.0)} if hasattr(genai.types, "RequestOptions") else None
+                request_options={"retry": retry.Retry(predicate=lambda e: False), "timeout": 15.0} if hasattr(genai.types, "RequestOptions") else None
             )
             
-            for chunk in response:
+            async for chunk in response:
                 if chunk.candidates and chunk.candidates[0].content.parts:
                     part = chunk.candidates[0].content.parts[0]
                     if hasattr(part, "function_call") and part.function_call:
