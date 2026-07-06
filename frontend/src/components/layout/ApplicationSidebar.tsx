@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useLocation, Link } from 'react-router-dom';
+import {  useLocation, Link } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   CheckSquare, 
@@ -16,7 +16,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useBoardStore, useActiveBoards } from '../../store/boardStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useUiStore } from '../../store/uiStore';
-import WorkspaceSwitcher from '../common/WorkspaceSwitcher';
+import WorkspaceSwitcher from '../../features/projects/components/WorkspaceSwitcher';
 import { ProjectIdentity } from '../common/ProjectIdentity';
 import UserAvatarDropdown from './UserAvatarDropdown';
 import { formatUserName } from '../../utils/userHelpers';

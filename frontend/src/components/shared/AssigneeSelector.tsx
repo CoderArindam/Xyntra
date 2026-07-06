@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserRound } from 'lucide-react';
-import { type User } from '../../api/usersApi';
+import { type User } from '../../services/usersApi';
 import { formatUserName } from '../../utils/userHelpers';
 
 interface AssigneeSelectorProps {

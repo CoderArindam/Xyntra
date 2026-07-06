@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
-import { getBoards, createBoard, deleteBoard, type Board } from '../api/boardsApi';
+import { getBoards, createBoard, deleteBoard, type Board } from '../services/boardsApi';
 import toast from 'react-hot-toast';
 
 interface BoardState {

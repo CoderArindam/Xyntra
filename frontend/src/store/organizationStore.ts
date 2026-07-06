@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getOrganizationProfile, updateOrganizationProfile, type OrganizationProfile, type OrganizationProfileUpdate } from '../api/organizationApi';
+import { getOrganizationProfile, updateOrganizationProfile, type OrganizationProfile, type OrganizationProfileUpdate } from '../services/organizationApi';
 
 interface OrganizationState {
   profile: OrganizationProfile | null;

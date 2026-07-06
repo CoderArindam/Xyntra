@@ -5,8 +5,8 @@ import {
   markAllRead, 
   deleteNotification,
   markBatchRead
-} from '../api/notificationsApi';
-import type { Notification } from '../api/notificationsApi';
+} from '../services/notificationsApi';
+import type { Notification } from '../services/notificationsApi';
 import toast from 'react-hot-toast';
 
 interface NotificationState {

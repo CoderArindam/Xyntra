@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import os
 from pathlib import Path
 from app.database.connection import db
-from app.routers import auth, boards, tasks, users, comments, attachments, activity, board_members, admin, invitations, notifications, my_work, preferences, organization
+from app.routers import auth, boards, tasks, users, comments, attachments, activity, board_members, admin, invitations, notifications, my_work, preferences, organization, ai
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -54,6 +54,7 @@ app.include_router(invitations.router, prefix="/api/v1")
 app.include_router(my_work.router, prefix="/api/v1")
 app.include_router(preferences.router, prefix="/api/v1")
 app.include_router(organization.router, prefix="/api/v1")
+app.include_router(ai.router, prefix="/api/v1")
 
 @app.get("/health", tags=["Health"])
 async def health_check():

@@ -1,16 +1,19 @@
-import React, { useEffect } from "react";
-import { Outlet } from "react-router-dom";
-import { useAuthStore } from "../../store/authStore";
-import { usePreferencesStore } from "../../store/preferencesStore";
-import { useOrganizationStore } from "../../store/organizationStore";
-import { useUiStore } from "../../store/uiStore";
-import WorkspaceLoader from "../common/WorkspaceLoader";
-import { updateFavicon } from "../../utils/favicon";
+import React, { useEffect } from 'react';
+import { Outlet } from 'react-router-dom';
 
-import ApplicationSidebar from "./ApplicationSidebar";
+import { usePreferencesStore } from '../../store/preferencesStore';
+import { useOrganizationStore } from '../../store/organizationStore';
+import { useUiStore } from '../../store/uiStore';
+import WorkspaceLoader from '../common/WorkspaceLoader';
+import { updateFavicon } from '../../utils/favicon';
+
+import ApplicationSidebar from './ApplicationSidebar';
+import { AIButton } from '../../features/ai/components/AIButton';
+import { AIPanel } from '../../features/ai/components/AIPanel';
+import CreateProjectModal from '../../features/projects/components/CreateProjectModal';
 
 export const AppLayout: React.FC = () => {
-  const { user } = useAuthStore();
+  
   const { profile, isLoading: isProfileLoading } = useOrganizationStore();
   const { isLoading: isPreferencesLoading } = usePreferencesStore();
   const { pageTitle } = useUiStore();
@@ -45,6 +48,9 @@ export const AppLayout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+      <AIButton />
+      <AIPanel />
+      <CreateProjectModal />
     </div>
   );
 };

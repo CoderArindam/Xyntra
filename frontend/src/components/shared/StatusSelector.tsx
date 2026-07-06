@@ -1,6 +1,6 @@
 import React from 'react';
 import { Columns } from 'lucide-react';
-import { type Column } from '../../api/tasksApi';
+import { type Column } from '../../services/tasksApi';
 
 interface StatusSelectorProps {
   columnId: number | undefined;

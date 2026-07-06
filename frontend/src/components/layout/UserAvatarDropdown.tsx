@@ -1,16 +1,16 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { useAuthStore } from "../../store/authStore";
-import { UserAvatar } from "../common/UserAvatar";
+import React, { useState, useRef, useEffect } from 'react';
+
+import { useAuthStore } from '../../store/authStore';
+import { UserAvatar } from '../common/UserAvatar';
 import {
-  Settings,
-  User,
+  
+  
   LogOut,
-  HelpCircle,
-  Command,
-  Building2,
-} from "lucide-react";
-import { formatUserName } from "../../utils/userHelpers";
+  
+  
+  
+} from 'lucide-react';
+import { formatUserName } from '../../utils/userHelpers';
 
 interface UserAvatarDropdownProps {
   isSidebarCollapsed?: boolean;

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getProjectSettings, updateProjectSettings, archiveProject, type ProjectSettingsUpdate, type ProjectSettingsResponse } from '../api/projectSettingsApi';
+import { getProjectSettings, updateProjectSettings, archiveProject, type ProjectSettingsUpdate, type ProjectSettingsResponse } from '../services/projectSettingsApi';
 import { useBoardStore } from './boardStore';
 import toast from 'react-hot-toast';
 
@@ -13,7 +13,7 @@ interface ProjectSettingsState {
   archiveProject: (boardId: number) => Promise<void>;
 }
 
-export const useProjectSettingsStore = create<ProjectSettingsState>((set, get) => ({
+export const useProjectSettingsStore = create<ProjectSettingsState>((set) => ({
   currentSettings: null,
   isLoading: false,
   isSaving: false,

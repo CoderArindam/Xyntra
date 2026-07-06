@@ -10,8 +10,8 @@ import {
   adminFetchBoardMembers, 
   adminAssignUser, 
   adminRemoveUser 
-} from '../api/adminApi';
-import { adminInviteUser, adminListInvitations, type Invitation } from '../api/invitationsApi';
+} from '../services/adminApi';
+import { adminInviteUser, adminListInvitations, type Invitation } from '../services/invitationsApi';
 import toast from 'react-hot-toast';
 
 interface AdminState {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import type { Board } from '../../api/boardsApi';
+import type { Board } from '../../services/boardsApi';
 import { getProjectColorClass, getProjectGradientClass } from '../../utils/projectIdentity';
 
 interface ProjectCardProps {

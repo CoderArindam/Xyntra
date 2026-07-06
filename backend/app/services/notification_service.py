@@ -62,3 +62,74 @@ def dispatch_task_email(
     except Exception as e:
         logger.error(f"Failed to dispatch email notification for {activity_type}: {e}")
 
+import asyncpg
+from fastapi import HTTPException
+from typing import List, Optional
+from app.schemas.notifications import MarkBatchReadRequest, CanonicalNotificationResponse
+from app.schemas.common import MetaResponse
+
+class NotificationService:
+    def __init__(self, conn: asyncpg.Connection):
+        self.conn = conn
+
+    async def get_notifications(self, cursor: Optional[int], limit: int, current_user: dict):
+        try:
+            query = "SELECT * FROM v_notifications_canonical WHERE user_id = $1"
+            args = [current_user["id"]]
+            
+            if cursor is not None:
+                query += " AND id < $2"
+                args.append(cursor)
+                
+            args.append(limit + 1)
+            query += f" ORDER BY id DESC LIMIT ${len(args)}"
+            
+            rows = await self.conn.fetch(query, *args)
+            
+            has_more = len(rows) > limit
+            notifications = rows[:limit]
+            
+            next_cursor = str(notifications[-1]["id"]) if notifications else None
+            
+            return [CanonicalNotificationResponse(**dict(row)) for row in notifications], MetaResponse(cursor=next_cursor, has_more=has_more)
+        except Exception as e:
+            logger.error(f"Error fetching notifications: {e}")
+            raise HTTPException(status_code=500, detail="An error occurred while fetching notifications")
+
+    async def mark_read(self, notification_id: int, current_user: dict):
+        try:
+            await self.conn.execute(
+                "UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2",
+                notification_id, current_user["id"]
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Failed to mark notification as read")
+
+    async def mark_batch_read(self, payload: MarkBatchReadRequest, current_user: dict):
+        if not payload.notification_ids:
+            return
+        try:
+            await self.conn.execute(
+                "UPDATE notifications SET is_read = true WHERE user_id = $1 AND id = ANY($2::int[])",
+                current_user["id"], payload.notification_ids
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Failed to mark notifications as read")
+
+    async def mark_all_read(self, current_user: dict):
+        try:
+            await self.conn.execute(
+                "UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false",
+                current_user["id"]
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Failed to mark all notifications as read")
+
+    async def delete_notification(self, notification_id: int, current_user: dict):
+        try:
+            await self.conn.execute(
+                "DELETE FROM notifications WHERE id = $1 AND user_id = $2",
+                notification_id, current_user["id"]
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Failed to delete notification")

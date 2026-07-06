@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { loginUser, logoutUser, getMe } from '../api/authApi';
+import { loginUser, logoutUser, getMe } from '../services/authApi';
 import toast from 'react-hot-toast';
 
 interface User {

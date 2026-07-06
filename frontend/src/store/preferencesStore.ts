@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { getPreferences, updatePreferences } from '../api/preferences';
-import type { UserPreferences, UserPreferencesUpdate, ThemeType } from '../api/preferences';
+import { getPreferences, updatePreferences } from '../services/preferencesApi';
+import type { UserPreferences, UserPreferencesUpdate, ThemeType } from '../services/preferencesApi';
 
 interface PreferencesState {
   preferences: UserPreferences | null;

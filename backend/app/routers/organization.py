@@ -1,22 +1,33 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from app.schemas.organization import OrganizationProfileResponse, OrganizationProfileUpdate
-from app.services.organization import OrganizationService
-from app.services.storage_service import StorageService
+from app.services.organization_service import OrganizationService
 from app.auth.dependencies import get_current_user
+from app.database.connection import get_db_connection
 
 router = APIRouter(prefix="/organization", tags=["Organization"])
 
+
+def get_organization_service(conn = Depends(get_db_connection)) -> OrganizationService:
+    return OrganizationService(conn)
+
+def get_org_service(conn = Depends(get_db_connection)) -> OrganizationService:
+    return OrganizationService(conn)
+
 @router.get("/profile", response_model=OrganizationProfileResponse)
-async def get_organization_profile(current_user: dict = Depends(get_current_user)):
+async def get_organization_profile(
+    current_user: dict = Depends(get_current_user),
+    org_service: OrganizationService = Depends(get_org_service)
+):
     org_id = current_user.get("organization_id")
     if not org_id:
         raise HTTPException(status_code=400, detail="No organization context found")
-    return await OrganizationService.get_profile(org_id)
+    return await org_service.get_profile(org_id)
 
 @router.patch("/profile", response_model=OrganizationProfileResponse)
 async def update_organization_profile(
     updates: OrganizationProfileUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    org_service: OrganizationService = Depends(get_org_service)
 ):
     if current_user.get("role") != "SUPER_ADMIN":
         raise HTTPException(
@@ -28,12 +39,13 @@ async def update_organization_profile(
     if not org_id:
         raise HTTPException(status_code=400, detail="No organization context found")
         
-    return await OrganizationService.update_profile(org_id, updates)
+    return await org_service.update_profile(org_id, updates)
 
 @router.post("/logo")
 async def upload_organization_logo(
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    org_service: OrganizationService = Depends(get_org_service)
 ):
     if current_user.get("role") != "SUPER_ADMIN":
         raise HTTPException(
@@ -45,8 +57,5 @@ async def upload_organization_logo(
     if not org_id:
         raise HTTPException(status_code=400, detail="No organization context found")
         
-    try:
-        url = await StorageService.save_logo(file)
-        return {"logo_url": url}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to upload logo")
+    url = await org_service.upload_logo(file, org_id)
+    return {"logo_url": url}

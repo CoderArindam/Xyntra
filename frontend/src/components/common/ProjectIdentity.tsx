@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Board } from '../../api/boardsApi';
+import type { Board } from '../../services/boardsApi';
 import { getProjectColorClass } from '../../utils/projectIdentity';
 
 interface ProjectIdentityProps {

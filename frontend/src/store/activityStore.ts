@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { getTaskActivity } from '../api/activityApi';
-import type { CanonicalActivity as Activity } from '../api/activityApi';
+import { getTaskActivity } from '../services/activityApi';
+import type { CanonicalActivity as Activity } from '../services/activityApi';
 
 interface ActivityState {
   activitiesByTask: Record<number, Activity[]>;

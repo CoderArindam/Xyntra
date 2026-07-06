@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { getBoardTasks, createTask, updateTaskStatus, deleteTask, updateTaskAssignee, updateTask, type Task, type Column } from '../api/tasksApi';
+import { getBoardTasks, createTask, updateTaskStatus, deleteTask, updateTaskAssignee, updateTask, type Task, type Column } from '../services/tasksApi';
 import { useActivityStore } from './activityStore';
-import { getUsers, getBoardMembers, type User, type BoardMember } from '../api/usersApi';
+import { getUsers, getBoardMembers, type User, type BoardMember } from '../services/usersApi';
 import toast from 'react-hot-toast';
 
 interface TaskState {
@@ -168,10 +168,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         const newUsers = { ...state.entities.users };
         const newMembers: Record<number, BoardMember> = {};
 
-        fetchedTasks.forEach(t => { newTasks[t.id] = t; });
-        fetchedColumns.forEach(c => { newColumns[c.id] = c; });
-        usersList.forEach(u => { newUsers[u.id] = u; });
-        membersList.forEach(m => { newMembers[m.id] = m; });
+        fetchedTasks.forEach((t: any) => { newTasks[t.id] = t; });
+        fetchedColumns.forEach((c: any) => { newColumns[c.id] = c; });
+        usersList.forEach((u: any) => { newUsers[u.id] = u; });
+        membersList.forEach((m: any) => { newMembers[m.id] = m; });
 
         return {
           entities: {
@@ -182,8 +182,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           },
           boardView: {
             boardId,
-            taskIds: fetchedTasks.map(t => t.id),
-            columnIds: fetchedColumns.map(c => c.id),
+            taskIds: fetchedTasks.map((t: any) => t.id),
+            columnIds: fetchedColumns.map((c: any) => c.id),
             selectedAssigneeId: initialAssigneeId,
             isFetching: false
           }
@@ -199,17 +199,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   loadMyTasks: async (params) => {
     set((state) => ({ myWorkView: { ...state.myWorkView, isFetching: true } }));
     try {
-      const { getMyTasks } = await import('../api/myWorkApi');
+      const { getMyTasks } = await import('../services/myWorkApi');
       const myTasksList = await getMyTasks(params);
       
       set((state) => {
         const newTasks = { ...state.entities.tasks };
-        myTasksList.forEach(t => { newTasks[t.id] = t; });
+        myTasksList.forEach((t: any) => { newTasks[t.id] = t; });
 
         return {
           entities: { ...state.entities, tasks: newTasks },
           myWorkView: {
-            taskIds: myTasksList.map(t => t.id),
+            taskIds: myTasksList.map((t: any) => t.id),
             isFetching: false
           }
         };
