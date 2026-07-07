@@ -6,6 +6,7 @@ from app.ai.prompts.registry import PromptRegistry
 
 from app.ai.orchestration.renderers import render_list, render_entity, render_success, render_failure
 
+
 class TemplateRegistry:
     def __init__(self):
         self.templates: Dict[str, Callable[[Any], str | None]] = {}
@@ -15,6 +16,10 @@ class TemplateRegistry:
         
     def get_template(self, result: ExecutionResult) -> str | None:
         if result.status == ExecutionStatus.FAILED:
+            # Extract error details from step results
+            errors = [sr.error for sr in result.step_results if sr.error]
+            if errors:
+                return f"I ran into an issue: {errors[0]}"
             return "I encountered an error while trying to complete that request."
             
         if not hasattr(result, "step_results") or not result.step_results:
@@ -33,53 +38,193 @@ class TemplateRegistry:
                     parts.append(rendered)
                     
         if parts:
-            return "\n\n---\n\n".join(parts)
+            return "\n\n".join(parts)
             
         return None
 
+
 template_registry = TemplateRegistry()
 
-# Workspace read actions
-list_projects_renderer = lambda output: render_list(
-    f"You currently have {len(output.get('projects', []))} projects.", 
-    output.get("projects", []), 
-    display_field="name"
-) if output and isinstance(output, dict) else None
 
-template_registry.register("list_projects", list_projects_renderer)
-template_registry.register("list_boards", list_projects_renderer)
+# --- Workspace Read Templates ---
 
-list_tasks_renderer = lambda output: render_list(
-    f"You currently have {len(output.get('tasks', []))} tasks.",
-    output.get("tasks", []),
-    display_field="title",
-    secondary_field="column_name"
-) if output and isinstance(output, dict) else None
+def _render_projects(output):
+    if not output or not isinstance(output, dict):
+        return None
+    projects = output.get("projects", [])
+    if not projects:
+        return "You don't have any projects yet. Would you like me to create one?"
+    return render_list(
+        f"You have **{len(projects)}** project{'s' if len(projects) != 1 else ''}:",
+        projects,
+        display_field="name"
+    )
 
-template_registry.register("list_tasks", list_tasks_renderer)
+template_registry.register("list_projects", _render_projects)
+template_registry.register("list_boards", _render_projects)
 
-template_registry.register("get_users", lambda output: render_list(
-    f"Found {len(output.get('users', []))} workspace members.",
-    output.get("users", []),
-    display_field="first_name",
-    secondary_field="email"
-) if output and isinstance(output, dict) else None)
 
-template_registry.register("get_task_details", lambda output: render_entity(
-    "Task Details",
-    output.get("task", {}),
-    fields=["title", "column_name", "priority", "assignee_id"]
-) if output and isinstance(output, dict) else None)
+def _render_tasks(output):
+    if not output or not isinstance(output, dict):
+        return None
+    tasks = output.get("tasks", [])
+    if not tasks:
+        return "No tasks found matching your criteria."
+    count = len(tasks)
+    return render_list(
+        f"Found **{count}** task{'s' if count != 1 else ''}:",
+        tasks,
+        display_field="title",
+        secondary_field="column_name"
+    )
 
-# Domain tool actions
+template_registry.register("list_tasks", _render_tasks)
 
-template_registry.register("create_task", lambda output: render_success(
-    "Create Task", output.get("message", "Task created successfully")
-) if output and isinstance(output, dict) else None)
 
-template_registry.register("update_task", lambda output: render_success(
-    "Update Task", output.get("message", "Task updated successfully")
-) if output and isinstance(output, dict) else None)
+def _render_users(output):
+    if not output or not isinstance(output, dict):
+        return None
+    users = output.get("users", [])
+    if not users:
+        return "No workspace members found."
+    return render_list(
+        f"**{len(users)}** workspace member{'s' if len(users) != 1 else ''}:",
+        users,
+        display_field="first_name",
+        secondary_field="email"
+    )
+
+template_registry.register("get_users", _render_users)
+
+
+def _render_task_details(output):
+    if not output or not isinstance(output, dict):
+        return None
+    return render_entity(
+        "Task Details",
+        output.get("task", {}),
+        fields=["title", "column_name", "priority", "assignee_id", "due_date", "description"]
+    )
+
+template_registry.register("get_task_details", _render_task_details)
+
+
+def _render_board_summary(output):
+    if not output or not isinstance(output, dict):
+        return None
+    total = output.get("total_tasks", 0)
+    completed = output.get("completed_tasks", 0)
+    progress = output.get("progress_percent", 0)
+    overdue = output.get("overdue_tasks", 0)
+    by_status = output.get("tasks_by_status", {})
+    members = output.get("member_count", 0)
+    
+    lines = [f"### Project Summary\n"]
+    lines.append(f"- **Total Tasks:** {total}")
+    lines.append(f"- **Progress:** {progress}% complete ({completed}/{total})")
+    if overdue > 0:
+        lines.append(f"- ⚠️ **Overdue:** {overdue} task{'s' if overdue != 1 else ''}")
+    lines.append(f"- **Members:** {members}")
+    
+    if by_status:
+        lines.append(f"\n**By Status:**")
+        for status, count in by_status.items():
+            lines.append(f"- {status}: {count}")
+    
+    by_priority = output.get("tasks_by_priority", {})
+    if by_priority:
+        lines.append(f"\n**By Priority:**")
+        for prio, count in by_priority.items():
+            lines.append(f"- {prio}: {count}")
+    
+    return "\n".join(lines)
+
+template_registry.register("get_board_summary", _render_board_summary)
+
+
+# --- Mutation Templates ---
+
+def _render_create_task(output):
+    if not output or not isinstance(output, dict):
+        return None
+    msg = output.get("message", "Task created successfully")
+    return render_success("Task Created", msg)
+
+template_registry.register("create_task", _render_create_task)
+
+
+def _render_update_task(output):
+    if not output or not isinstance(output, dict):
+        return None
+    action = output.get("action", "updated")
+    title = f"Task {action.replace('_', ' ').title()}"
+    msg = output.get("message", "Task updated successfully")
+    return render_success(title, msg)
+
+template_registry.register("update_task", _render_update_task)
+
+
+def _render_delete_task(output):
+    if not output or not isinstance(output, dict):
+        return None
+    return render_success("Task Deleted", output.get("message", "Task deleted successfully"))
+
+template_registry.register("delete_task", _render_delete_task)
+
+
+def _render_create_board(output):
+    if not output or not isinstance(output, dict):
+        return None
+    return render_success("Project Created", output.get("message", "Project created successfully"))
+
+template_registry.register("create_board", _render_create_board)
+
+
+def _render_archive_board(output):
+    if not output or not isinstance(output, dict):
+        return None
+    return render_success("Project Archived", output.get("message", "Project archived successfully"))
+
+template_registry.register("archive_board", _render_archive_board)
+
+
+def _render_delete_board(output):
+    if not output or not isinstance(output, dict):
+        return None
+    return render_success("Project Deleted", output.get("message", "Project deleted successfully"))
+
+template_registry.register("delete_board", _render_delete_board)
+
+
+def _render_add_comment(output):
+    if not output or not isinstance(output, dict):
+        return None
+    return render_success("Comment Added", output.get("message", "Comment added successfully"))
+
+template_registry.register("add_comment", _render_add_comment)
+
+
+def _render_get_comments(output):
+    if not output or not isinstance(output, dict):
+        return None
+    verified = output.get("verified", {})
+    comments = verified.get("comments", [])
+    if not comments:
+        return "No comments found for this task."
+    
+    lines = [f"Found **{len(comments)}** comment{'s' if len(comments) != 1 else ''}:"]
+    for c in comments:
+        user_name = f"{c.get('user_first_name') or ''} {c.get('user_last_name') or ''}".strip() or "User"
+        date = c.get('created_at', '').split('T')[0] if c.get('created_at') else ""
+        content = c.get('content', '')
+        lines.append(f"**{user_name}** ({date}):\n> {content}")
+        
+    return "\n\n".join(lines)
+
+template_registry.register("get_comments", _render_get_comments)
+
+
+# --- Composer ---
 
 class ResponseComposer:
     """

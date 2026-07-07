@@ -1,15 +1,39 @@
 from typing import Any, Dict, List
 from app.ai.agents.base import BaseAgent
 from app.ai.prompts.registry import PromptRegistry
-from app.ai.tools.workspace_tools import GetTaskTool, ListBoardsTool, ListTasksTool, GetWorkspaceUsersTool
-from app.ai.tools.domain_tools import CreateTaskTool, UpdateTaskTool, DeleteTaskTool
+from app.ai.tools.workspace_tools import (
+    GetTaskTool, ListBoardsTool, ListTasksTool,
+    GetWorkspaceUsersTool, GetBoardSummaryTool
+)
+from app.ai.tools.domain_tools import (
+    CreateTaskTool, UpdateTaskTool, DeleteTaskTool,
+    CreateBoardTool, ArchiveBoardTool, DeleteBoardTool,
+    AddCommentTool, GetCommentsTool
+)
+
 
 class WorkspaceAssistantAgent(BaseAgent):
-    """
-    Main assistant agent for handling user workspace queries.
-    """
+    """Main assistant agent for handling user workspace queries."""
     name = "workspace_assistant"
-    available_tools = [ListBoardsTool, ListTasksTool, GetWorkspaceUsersTool, GetTaskTool, CreateTaskTool, UpdateTaskTool, DeleteTaskTool]
+    available_tools = [
+        # Workspace reads
+        ListBoardsTool,
+        ListTasksTool,
+        GetWorkspaceUsersTool,
+        GetTaskTool,
+        GetBoardSummaryTool,
+        # Task mutations
+        CreateTaskTool,
+        UpdateTaskTool,
+        DeleteTaskTool,
+        # Board mutations
+        CreateBoardTool,
+        ArchiveBoardTool,
+        DeleteBoardTool,
+        # Comments
+        AddCommentTool,
+        GetCommentsTool,
+    ]
 
     def build_messages(self, user_input: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
         import datetime

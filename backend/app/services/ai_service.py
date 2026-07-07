@@ -1,6 +1,7 @@
 import json
 import logging
 import asyncio
+import os
 from typing import Any, Dict, List, Optional, AsyncGenerator
 from datetime import datetime
 import asyncpg
@@ -20,17 +21,18 @@ from app.ai.orchestration.composer import ResponseComposer
 
 logger = logging.getLogger(__name__)
 
-
 # Limits users to 15 requests per minute to match Gemini Free Tier
 _RATE_LIMIT_STORE: Dict[int, List[datetime]] = {}
-RATE_LIMIT_REQUESTS = 15
-RATE_LIMIT_WINDOW = 60 # seconds
+RATE_LIMIT_REQUESTS = int(os.environ.get("RATE_LIMIT_REQUESTS", 15))
+RATE_LIMIT_WINDOW = 60  # seconds
+
+# Maximum conversation history messages to include for planner context
+MAX_HISTORY_MESSAGES = 20
+
 
 def check_rate_limit(user_id: int):
     now = datetime.utcnow()
     timestamps = _RATE_LIMIT_STORE.get(user_id, [])
-    
-    # Filter timestamps within the window
     timestamps = [ts for ts in timestamps if (now - ts).total_seconds() < RATE_LIMIT_WINDOW]
     
     if len(timestamps) >= RATE_LIMIT_REQUESTS:
@@ -39,13 +41,13 @@ def check_rate_limit(user_id: int):
     timestamps.append(now)
     _RATE_LIMIT_STORE[user_id] = timestamps
 
+
 class AIService:
     def __init__(self, conn: asyncpg.Connection):
         self.conn = conn
         self.gateway = AIGateway()
         
     async def _build_full_context(self, current_user: dict, ui_context) -> Dict[str, Any]:
-        # Merge DB context with UI context
         context_builder = WorkspaceContextBuilder(self.conn)
         
         board_id = None
@@ -67,6 +69,36 @@ class AIService:
         db_context["Current Date & Time"] = datetime.datetime.now().isoformat()
             
         return db_context
+
+    def _build_planner_input(self, messages: List[ChatMessage]) -> tuple[str, str]:
+        """Build user_input and planner_input from message list.
+        
+        Returns (user_input, planner_input) where planner_input includes
+        conversation history for context resolution.
+        """
+        if not messages:
+            return "", ""
+        
+        user_input = messages[-1].content
+        
+        if len(messages) > 1:
+            # Include up to MAX_HISTORY_MESSAGES for context
+            history_slice = messages[-(MAX_HISTORY_MESSAGES + 1):-1]
+            history_lines = []
+            for m in history_slice:
+                role_name = "User" if m.role == "user" else "Assistant"
+                # Truncate long assistant responses to save tokens
+                content = m.content
+                if m.role == "assistant" and len(content) > 300:
+                    content = content[:300] + "..."
+                history_lines.append(f"{role_name}: {content}")
+            
+            history_str = "\n".join(history_lines)
+            planner_input = f"Conversation History:\n{history_str}\n\nCurrent Request:\n{user_input}"
+        else:
+            planner_input = user_input
+        
+        return user_input, planner_input
 
     async def chat_stream(self, request: AIChatRequest, current_user: dict, request_id: str) -> AsyncGenerator[str, None]:
         from app.ai.telemetry.context import TraceContext
@@ -95,8 +127,8 @@ class AIService:
             tracer.end()
             return
             
+        exec_context = None
         try:
-            # Enforce rate limit
             check_rate_limit(current_user.get("id"))
             
             exec_context = ExecutionContext(
@@ -108,30 +140,15 @@ class AIService:
                 current_state=ExecutionStatus.CREATED
             )
             exec_context.timeout_metadata = timeout_policy.model_dump()
-            
-            # Re-assign the generated execution ID from tracer to exec_context
             exec_context.execution_id = tracer.execution_id
             
-            # Build workspace context string once to optimize token serialization
+            # Build workspace context
             workspace_ctx_dict = await self._build_full_context(current_user, request.ui_context)
             exec_context.workspace_context_str = json.dumps(workspace_ctx_dict)
             
-            if not request.messages:
-                user_input = ""
-                planner_input = ""
-            else:
-                user_input = request.messages[-1].content
-                if len(request.messages) > 1:
-                    history_lines = []
-                    # Include last 4 messages for context
-                    for m in request.messages[-5:-1]:
-                        role_name = "User" if m.role == "user" else "Assistant"
-                        history_lines.append(f"{role_name}: {m.content}")
-                    
-                    history_str = "\n".join(history_lines)
-                    planner_input = f"Conversation History:\n{history_str}\n\nCurrent Request:\n{user_input}"
-                else:
-                    planner_input = user_input
+            # Build planner input with full conversation history
+            user_input, planner_input = self._build_planner_input(request.messages)
+            
             if request.confirmed_plan:
                 plan = ExecutionPlan(**request.confirmed_plan)
                 skip_confirmation = True
@@ -212,7 +229,6 @@ class AIService:
                 if getattr(plan, "confidence_score", 1.0) < 0.7:
                     yield f"data: {json.dumps({'v': '1.0', 'type': 'error', 'error': 'I am not entirely sure how to proceed with that request. Could you clarify or provide more details?'})}\n\n"
                     exec_context.current_state = ExecutionStatus.FAILED
-                    # We don't raise an exception because we want to yield this exact message and terminate gracefully
                     return
                 
                 yield f"data: {json.dumps({'v': '1.0', 'type': 'planning_completed', 'plan': plan.model_dump(), 'timestamp': 0})}\n\n"
@@ -225,11 +241,13 @@ class AIService:
             from app.services.board_service import BoardService
             from app.services.task_service import TaskService
             from app.services.user_service import UserService
+            from app.services.comment_service import CommentService
             
             services = {
                 "board_service": BoardService(self.conn),
                 "task_service": TaskService(self.conn),
-                "user_service": UserService(self.conn)
+                "user_service": UserService(self.conn),
+                "comment_service": CommentService(self.conn)
             }
             
             ExecutionStateMachine.validate_transition(exec_context.current_state, ExecutionStatus.EXECUTING)
@@ -238,7 +256,6 @@ class AIService:
             execution_result = None
             
             try:
-                # Use asyncio.wait_for for overall execution timeout
                 async def run_executor():
                     nonlocal execution_result
                     async for event_string in executor.execute(plan, exec_context, skip_confirmation):
@@ -253,24 +270,10 @@ class AIService:
                         yield event_string
                         await asyncio.sleep(0)
                 
-                tx = self.conn.transaction()
-                await tx.start()
-                try:
-                    async for evt in run_executor():
-                        yield evt
-                        
-                    if execution_result and execution_result.status == ExecutionStatus.FAILED:
-                        await tx.rollback()
-                        yield f"data: {json.dumps({'v': '1.0', 'type': 'system_message', 'content': 'An error occurred during execution. All partial changes have been rolled back to protect your data.'})}\n\n"
-                    elif execution_result and execution_result.status == ExecutionStatus.PARTIALLY_COMPLETED:
-                        await tx.rollback()
-                        yield f"data: {json.dumps({'v': '1.0', 'type': 'system_message', 'content': 'Execution was partially completed, but due to safety constraints, all changes have been rolled back.'})}\n\n"
-                        execution_result.status = ExecutionStatus.FAILED
-                    else:
-                        await tx.commit()
-                except Exception:
-                    await tx.rollback()
-                    raise
+                # No outer transaction — let individual service methods handle atomicity
+                async for evt in run_executor():
+                    yield evt
+                    
             except asyncio.TimeoutError:
                 raise ExecutionTimeoutError("Overall execution timed out", stage="EXECUTING")
                 
@@ -282,17 +285,28 @@ class AIService:
                     async for event_string in composer.compose(execution_result, exec_context):
                         yield event_string
                         await asyncio.sleep(0)
+                elif execution_result.status == ExecutionStatus.FAILED:
+                    yield f"data: {json.dumps({'v': '1.0', 'type': 'assistant_message_start', 'execution_id': exec_context.execution_id})}\n\n"
+                    error_details = []
+                    for sr in execution_result.step_results:
+                        if sr.error:
+                            error_details.append(sr.error)
+                    error_msg = error_details[0] if error_details else "An error occurred while processing your request."
+                    yield f"data: {json.dumps({'v': '1.0', 'type': 'assistant_message_chunk', 'content': error_msg})}\n\n"
+                    yield f"data: {json.dumps({'v': '1.0', 'type': 'assistant_message_end'})}\n\n"
                 
         except asyncio.CancelledError:
-            exec_context.is_cancelled = True
-            exec_context.current_state = ExecutionStatus.CANCELLED
+            if exec_context:
+                exec_context.is_cancelled = True
+                exec_context.current_state = ExecutionStatus.CANCELLED
             tracer.end(Exception("Request was cancelled"))
             yield f"data: {json.dumps({'v': '1.0', 'type': 'execution_cancelled'})}\n\n"
             raise
         except Exception as e:
             from app.ai.orchestration.errors import ErrorMessageFactory
             user_msg = ErrorMessageFactory.get_user_message(e)
-            exec_context.current_state = ExecutionStatus.FAILED
+            if exec_context:
+                exec_context.current_state = ExecutionStatus.FAILED
             tracer.end(e)
             logger.error(f"Error in chat_stream: {str(e)}", exc_info=True)
             yield f"data: {json.dumps({'v': '1.0', 'type': 'error', 'error': user_msg})}\n\n"
