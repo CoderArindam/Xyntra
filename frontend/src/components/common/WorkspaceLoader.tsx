@@ -19,7 +19,7 @@ export const WorkspaceLoader: React.FC<WorkspaceLoaderProps> = ({ name, logoUrl 
           className="mb-6 shadow-sm" 
         />
         <h1 className="text-2xl font-bold tracking-tight text-brand-text mb-2">
-          {name || 'ProSync Workspace'}
+          {name || 'KAIO Workspace'}
         </h1>
         <div className="flex items-center justify-center gap-2 text-sm text-brand-text-muted mt-4 bg-brand-surface border border-brand-border px-4 py-2 rounded-full shadow-sm">
           <Loader2 className="animate-spin" size={16} />

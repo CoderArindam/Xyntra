@@ -9,14 +9,14 @@ class ConversationTemplateRegistry:
     
     _templates = {
         r"^(hi|hello|hey|good morning|good evening|good night)$": (
-            "Hello! I am your ProSync Assistant. I can help you manage your projects, boards, and tasks. "
+            "Hello! I am KAI. I can help you manage your projects, boards, and tasks. "
             "How can I assist you today?"
         ),
         r"^(how are you\??|what's up\??|hows it going\??)$": (
             "I'm functioning perfectly, thank you! Ready to help you manage your workspace. What do you need?"
         ),
         r"^(who are you\??|what can you do\??|what are you\??)$": (
-            "I am the ProSync Assistant. I'm integrated directly into your workspace. "
+            "I am KAI. I'm integrated directly into your workspace. "
             "I can list projects, manage boards, create tasks, and answer questions about project management."
         ),
         r"^(help\??)$": (

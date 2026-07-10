@@ -23,7 +23,7 @@ class InvitationService:
         frontend_url = settings.FRONTEND_ORIGINS.split(",")[0].strip()
         accept_url = f"{frontend_url}/accept-invitation?token={token}"
         body = (
-            f"You have been invited to join {org_name} on ProSync.\n\n"
+            f"You have been invited to join {org_name} on KAIO.\n\n"
             f"Click the link below to accept your invitation and set up your account:\n\n"
             f"{accept_url}\n\n"
             f"This invitation expires in {INVITATION_EXPIRE_HOURS} hours.\n\n"
@@ -31,7 +31,7 @@ class InvitationService:
         )
         send_email(
             to_email=to_email,
-            subject=f"You're invited to join {org_name} on ProSync",
+            subject=f"You're invited to join {org_name} on KAIO",
             body_text=body,
         )
 

@@ -22,9 +22,9 @@ export const AppLayout: React.FC = () => {
   useEffect(() => {
     const workspaceName = profile?.name || "Workspace";
     if (pageTitle) {
-      document.title = `${pageTitle} · ${workspaceName} | ProSync`;
+      document.title = `${pageTitle} · ${workspaceName} | KAIO`;
     } else {
-      document.title = `${workspaceName} | ProSync`;
+      document.title = `${workspaceName} | KAIO`;
     }
   }, [pageTitle, profile?.name]);
 

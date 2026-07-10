@@ -65,7 +65,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#0b0e14] text-white font-sans">
       <header className="flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold text-cyan-400">ProSync</h1>
+        <h1 className="text-2xl font-bold text-cyan-400">KAIO</h1>
 
         <nav className="hidden md:flex gap-8 text-gray-400">
           {["Features", "Solutions", "Pricing", "About"].map((item) => (
@@ -103,7 +103,7 @@ export default function LandingPage() {
           </h2>
 
           <p className="mt-6 text-gray-400 text-lg">
-            A powerful Kanban workspace for teams to organize tasks,
+            A powerful KAIO workspace for teams to organize tasks,
             collaborate, and deliver projects efficiently.
           </p>
 
@@ -183,7 +183,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="border-t border-white/10 py-8 text-center text-gray-500">
-        ProSync © 2024 ProSync. All rights reserved.
+        KAIO © 2024 KAIO. All rights reserved.
       </footer>
     </div>
   );

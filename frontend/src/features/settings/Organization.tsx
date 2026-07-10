@@ -522,7 +522,7 @@ export const Organization: React.FC = () => {
                         {displayName}
                       </span>
                       <span className="text-[10px] text-brand-text-muted uppercase tracking-wide">
-                        ProSync Workspace
+                        KAIO Workspace
                       </span>
                     </div>
                   </div>
@@ -535,7 +535,7 @@ export const Organization: React.FC = () => {
                   Browser Title
                 </p>
                 <div className="px-4 py-2 border border-brand-border bg-brand-surface rounded-t-lg shadow-sm text-sm text-brand-text truncate border-b-0 w-full max-w-[280px]">
-                  Settings • {displayName} | ProSync
+                  Settings • {displayName} | KAIO
                 </div>
                 <div className="h-6 w-full max-w-[280px] bg-brand-surface-low border border-brand-border rounded-b-lg border-t-0 shadow-sm"></div>
               </div>

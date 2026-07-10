@@ -207,7 +207,7 @@ export const ApplicationSidebar: React.FC = () => {
           >
             <Menu size={20} />
           </button>
-          <span className="font-bold text-brand-text">ProSync</span>
+          <span className="font-bold text-brand-text">KAIO</span>
         </div>
       </div>
 

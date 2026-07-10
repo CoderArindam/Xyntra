@@ -68,7 +68,7 @@ export const Signup: React.FC = () => {
           </h1>
 
           <p className="text-sm text-brand-text-muted max-w-[280px]">
-            Start managing your projects efficiently with ProSync.
+            Start managing your projects efficiently with KAIO.
           </p>
         </div>
 

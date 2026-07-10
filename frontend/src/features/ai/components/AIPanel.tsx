@@ -27,7 +27,7 @@ export const AIPanel: React.FC = () => {
       >
         <div className="flex items-center justify-between p-4 border-b border-brand-border bg-brand-surface">
           <h2 className="text-lg font-semibold text-brand-text flex items-center gap-2">
-            Workspace Assistant
+            KAI
           </h2>
           <button 
             onClick={() => setIsOpen(false)}

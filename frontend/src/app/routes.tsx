@@ -130,7 +130,7 @@ export const AppRoutes: React.FC = () => {
               element={
                 <PlaceholderSetting
                   title="Integrations"
-                  description="Connect ProSync with your favorite tools."
+                  description="Connect KAIO with your favorite tools."
                   Icon={Boxes}
                 />
               }

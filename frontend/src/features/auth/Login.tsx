@@ -40,7 +40,7 @@ export const Login: React.FC = () => {
           </h1>
 
           <p className="text-sm text-brand-text-muted max-w-[280px]">
-            Sign in to continue managing your projects with ProSync.
+            Sign in to continue managing your projects with KAIO.
           </p>
         </div>
 
@@ -107,7 +107,7 @@ export const Login: React.FC = () => {
             </Link>
           </p>
           <div className="mt-6">
-            <span className="text-[10px] text-brand-text-muted uppercase tracking-wider font-semibold">Powered by ProSync</span>
+            <span className="text-[10px] text-brand-text-muted uppercase tracking-wider font-semibold">Powered by KAIO</span>
           </div>
         </div>
       </div>

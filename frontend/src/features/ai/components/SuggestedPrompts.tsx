@@ -25,7 +25,7 @@ export const SuggestedPrompts: React.FC = () => {
       
       <div className="space-y-3 mb-10 w-full">
         <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-text via-brand-text to-brand-text-muted">
-          Welcome to ProSync AI
+          Welcome to KAI
         </h3>
         <p className="text-sm text-brand-text-muted max-w-[280px] mx-auto leading-relaxed">
           Your personal workspace assistant. I can help you manage tasks, analyze boards, and brainstorm ideas.

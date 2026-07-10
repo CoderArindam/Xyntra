@@ -36,7 +36,7 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({ isCollapse
           <>
             <div className="flex flex-col items-start hidden sm:flex">
               <span className="text-sm font-bold leading-tight text-brand-text truncate max-w-[150px]">{displayName}</span>
-              <span className="text-[10px] text-brand-text-muted leading-tight uppercase tracking-wide">ProSync Workspace</span>
+              <span className="text-[10px] text-brand-text-muted leading-tight uppercase tracking-wide">KAIO Workspace</span>
             </div>
             <ChevronDown size={14} className="text-brand-text-muted ml-1" />
           </>

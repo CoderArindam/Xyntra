@@ -16,8 +16,8 @@ async def lifespan(app: FastAPI):
     await db.disconnect()
 
 app = FastAPI(
-    title="Kanban Board MVP API",
-    description="Backend API for Kanban Board MVP",
+    title="KAIO API",
+    description="Backend API for KAIO",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -60,10 +60,10 @@ app.include_router(ai.router, prefix="/api/v1")
 async def health_check():
     return {
         "status": "healthy",
-        "service": "Kanban Board API",
+        "service": "KAIO API",
         "version": "1.0.0"
     }
 
 @app.get("/", tags=["Root"])
 async def root():
-    return {"message": "Welcome to Kanban Board MVP API. Access /docs for API documentation."}
+    return {"message": "Welcome to KAIO API. Access /docs for API documentation."}
