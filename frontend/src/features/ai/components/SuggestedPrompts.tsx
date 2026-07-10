@@ -1,11 +1,11 @@
 import React from 'react';
 import { useAIChat } from '../hooks/useAIChat';
-import { Sparkles, ArrowRight, Layout, ListTodo, Calendar, BrainCircuit } from 'lucide-react';
+import { Sparkles, ArrowRight, Layout, ListTodo, Calendar, BrainCircuit, Settings } from 'lucide-react';
 
 const SUGGESTIONS = [
   { text: "What am I working on?", icon: <ListTodo className="w-4 h-4" /> },
   { text: "Summarize this project.", icon: <Layout className="w-4 h-4" /> },
-  { text: "Show today's priorities.", icon: <Calendar className="w-4 h-4" /> }
+  { text: "Switch to Dark Mode.", icon: <Settings className="w-4 h-4" /> }
 ];
 
 export const SuggestedPrompts: React.FC = () => {
@@ -16,10 +16,9 @@ export const SuggestedPrompts: React.FC = () => {
       
       {/* Dynamic Header */}
       <div className="relative mb-8">
-        <div className="absolute -inset-4 bg-gradient-to-r from-brand-primary/40 via-purple-500/40 to-brand-primary/40 rounded-full blur-xl opacity-70 animate-pulse"></div>
-        <div className="relative w-20 h-20 bg-gradient-to-br from-brand-surface to-brand-bg rounded-2xl flex items-center justify-center border border-brand-border/50 shadow-xl overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-tr from-brand-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          <BrainCircuit className="w-10 h-10 text-brand-primary" />
+        <div className="absolute -inset-4 bg-gradient-to-r from-brand-primary/20 via-purple-500/20 to-brand-primary/20 rounded-full blur-xl opacity-70 transition-opacity duration-1000"></div>
+        <div className="relative w-16 h-16 bg-gradient-to-br from-brand-surface to-brand-bg rounded-2xl flex items-center justify-center border border-brand-border/50 shadow-md overflow-hidden group transition-all duration-300">
+          <BrainCircuit className="w-8 h-8 text-brand-primary/80" />
         </div>
       </div>
       

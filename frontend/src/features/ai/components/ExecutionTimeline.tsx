@@ -1,74 +1,106 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { AIEvent } from '../types/ai';
-import { Loader2, CheckCircle2, XCircle, PlayCircle, Search, Settings } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Search, Zap, Check } from 'lucide-react';
 
 interface ExecutionTimelineProps {
   events: AIEvent[];
 }
 
-export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = ({ events }) => {
-  if (!events || events.length === 0) return null;
+type PhaseStatus = 'pending' | 'running' | 'completed' | 'failed';
 
-  const renderIcon = (type: string, status?: string) => {
-    switch (type) {
-      case 'planning_started': return <Search className="w-4 h-4 text-brand-primary animate-pulse" />;
-      case 'planning_completed': return <CheckCircle2 className="w-4 h-4 text-brand-primary" />;
-      case 'execution_started': return <PlayCircle className="w-4 h-4 text-purple-500" />;
-      case 'step_started': return <Loader2 className="w-4 h-4 text-brand-text-muted animate-spin" />;
-      case 'step_completed': return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-      case 'execution_failed': 
-      case 'error': return <XCircle className="w-4 h-4 text-red-500" />;
-      case 'execution_completed': return <CheckCircle2 className="w-5 h-5 text-green-500" />;
-      default: return <Settings className="w-4 h-4 text-brand-text-muted" />;
+interface TimelinePhase {
+  id: string;
+  label: string;
+  status: PhaseStatus;
+  icon: React.ReactNode;
+}
+
+export const ExecutionTimeline: React.FC<ExecutionTimelineProps> = React.memo(({ events }) => {
+  const phases = useMemo(() => {
+    if (!events || events.length === 0) return [];
+    
+    let hasPlanning = false;
+    let planningDone = false;
+    let hasExecution = false;
+    let executionDone = false;
+    let hasFailed = false;
+    let hasCompleted = false;
+
+    events.forEach(event => {
+      if (event.type === 'planning_started') hasPlanning = true;
+      if (event.type === 'planning_completed') {
+        hasPlanning = true;
+        planningDone = true;
+      }
+      if (event.type === 'execution_started' || event.type === 'step_started') hasExecution = true;
+      if (event.type === 'execution_completed') {
+        hasExecution = true;
+        executionDone = true;
+        hasCompleted = true;
+      }
+      if (event.type === 'execution_failed' || event.type === 'error') hasFailed = true;
+    });
+
+    const timeline: TimelinePhase[] = [];
+
+    // Phase 1: Planning
+    if (hasPlanning) {
+      timeline.push({
+        id: 'planning',
+        label: 'Understanding request',
+        status: hasFailed && !planningDone ? 'failed' : planningDone ? 'completed' : 'running',
+        icon: <Search className="w-3.5 h-3.5" />
+      });
     }
+
+    // Phase 2: Executing
+    if (hasExecution || (planningDone && !hasFailed && !hasCompleted)) {
+      timeline.push({
+        id: 'executing',
+        label: 'Executing actions',
+        status: hasFailed && !executionDone ? 'failed' : executionDone ? 'completed' : 'running',
+        icon: <Zap className="w-3.5 h-3.5" />
+      });
+    }
+
+    // Phase 3: Done
+    if (hasCompleted || hasFailed) {
+      timeline.push({
+        id: 'done',
+        label: hasFailed ? 'Execution failed' : 'Completed successfully',
+        status: hasFailed ? 'failed' : 'completed',
+        icon: hasFailed ? <XCircle className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />
+      });
+    }
+
+    return timeline;
+  }, [events]);
+
+  if (phases.length === 0) return null;
+
+  const renderIcon = (status: PhaseStatus, defaultIcon: React.ReactNode) => {
+    if (status === 'running') return <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-primary" />;
+    if (status === 'completed') return <Check className="w-3.5 h-3.5 text-emerald-500" />;
+    if (status === 'failed') return <XCircle className="w-3.5 h-3.5 text-red-500" />;
+    return <span className="text-brand-text-muted">{defaultIcon}</span>;
   };
 
-  const renderMessage = (event: AIEvent) => {
-    switch (event.type) {
-      case 'planning_started': return 'Analyzing request and creating execution plan...';
-      case 'planning_completed': return 'Plan created successfully.';
-      case 'execution_started': return `Executing plan: ${event.goal || 'Starting'}`;
-      case 'step_started': return `Running step: ${event.description || event.step_id}`;
-      case 'step_completed': return `Completed step: ${event.step_id}`;
-      case 'execution_failed': return `Failed: ${event.error}`;
-      case 'execution_completed': return 'Execution completed successfully.';
-      case 'confirmation_required': return 'Waiting for confirmation...';
-      case 'error': return `Error: ${event.error}`;
-      default: return null;
-    }
-  };
-
-  // Only show the most recent "step_started" or "planning_started" if they are the latest,
-  // or show completed ones with dimmed styling.
-  
   return (
-    <div className="my-3 space-y-2">
-      {events.map((event, idx) => {
-        const msg = renderMessage(event);
-        if (!msg) return null;
-        
-        // Hide interim step_started if step_completed exists for it
-        if (event.type === 'step_started') {
-            const hasCompleted = events.some(e => 
-                (e.type === 'step_completed' || e.type === 'execution_failed') && e.step_id === event.step_id
-            );
-            if (hasCompleted) return null;
-        }
-        
-        if (event.type === 'planning_started') {
-             const hasCompleted = events.some(e => e.type === 'planning_completed');
-             if (hasCompleted) return null;
-        }
-
-        const isLatest = idx === events.length - 1;
-
-        return (
-          <div key={idx} className={`flex items-start gap-3 text-sm ${isLatest ? 'text-brand-text font-medium' : 'text-brand-text-muted'}`}>
-            <div className="mt-0.5">{renderIcon(event.type)}</div>
-            <div>{msg}</div>
+    <div className="my-4 flex flex-col gap-2">
+      {phases.map((phase) => (
+        <div key={phase.id} className="flex items-center gap-3 text-[13px] animate-fade-in-up">
+          <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-brand-surface border border-brand-border shadow-sm">
+            {renderIcon(phase.status, phase.icon)}
           </div>
-        );
-      })}
+          <span className={`font-medium transition-colors ${
+            phase.status === 'failed' ? 'text-red-500' :
+            phase.status === 'running' ? 'text-brand-text animate-pulse' :
+            phase.status === 'completed' ? 'text-brand-text' : 'text-brand-text-muted'
+          }`}>
+            {phase.label}
+          </span>
+        </div>
+      ))}
     </div>
   );
-};
+});

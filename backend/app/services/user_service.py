@@ -31,16 +31,8 @@ class UserService:
     async def update_me(self, payload: UserUpdate, current_user: dict) -> dict:
         try:
             row = await self.conn.fetchrow(
-                """
-                UPDATE users
-                SET 
-                    first_name = COALESCE($1::VARCHAR, first_name),
-                    last_name = COALESCE($2::VARCHAR, last_name),
-                    avatar_url = COALESCE($3::VARCHAR, avatar_url)
-                WHERE id = $4
-                RETURNING id, email, first_name, last_name, avatar_url, role, organization_id
-                """,
-                payload.first_name, payload.last_name, payload.avatar_url, current_user["id"]
+                "SELECT * FROM fn_update_user_profile($1, $2::VARCHAR, $3::VARCHAR, $4::VARCHAR)",
+                current_user["id"], payload.first_name, payload.last_name, payload.avatar_url
             )
             return dict(row)
         except Exception as e:

@@ -68,12 +68,12 @@ export const ApplicationSidebar: React.FC = () => {
         to={to}
         className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
           isActive 
-            ? 'bg-brand-surface-hover text-brand-primary' 
-            : 'text-brand-text hover:bg-brand-surface-low'
+            ? 'bg-sidebar-active text-sidebar-text font-semibold' 
+            : 'text-sidebar-text hover:bg-sidebar-active/50'
         }`}
         title={isSidebarCollapsed ? label : undefined}
       >
-        <Icon size={18} className={isActive ? 'text-brand-primary' : 'text-brand-text-muted'} />
+        <Icon size={18} className={isActive ? 'text-sidebar-text' : 'text-sidebar-text-muted'} />
         {!isSidebarCollapsed && (
           <span className="flex-1 truncate">{label}</span>
         )}
@@ -87,10 +87,10 @@ export const ApplicationSidebar: React.FC = () => {
   };
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-brand-surface border-r border-brand-border transition-all duration-300">
+    <div className="flex flex-col h-full bg-sidebar-bg border-r border-sidebar-border transition-all duration-300">
       
       {/* Header / Workspace */}
-      <div className={`p-4 border-b border-brand-border flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} shrink-0 min-h-[64px]`}>
+      <div className={`p-4 border-b border-sidebar-border flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} shrink-0 min-h-[64px]`}>
         {!isSidebarCollapsed ? (
           <div className="flex-1 min-w-0">
             <WorkspaceSwitcher />
@@ -105,7 +105,7 @@ export const ApplicationSidebar: React.FC = () => {
         
         {/* Main Section */}
         <div className="px-3 mb-6">
-          {!isSidebarCollapsed && <h3 className="px-3 text-xs font-bold text-brand-text-muted uppercase tracking-wider mb-2">Main</h3>}
+          {!isSidebarCollapsed && <h3 className="px-3 text-xs font-bold text-sidebar-text-muted uppercase tracking-wider mb-2">Main</h3>}
           <div className="space-y-1">
             <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" isExact />
             <NavItem to="/my-work" icon={CheckSquare} label="My Work" />
@@ -116,20 +116,20 @@ export const ApplicationSidebar: React.FC = () => {
         <div className="px-3 mb-6">
           {!isSidebarCollapsed && (
             <div className="px-3 mb-2 flex items-center justify-between">
-              <h3 className="text-xs font-bold text-brand-text-muted uppercase tracking-wider">Projects</h3>
+              <h3 className="text-xs font-bold text-sidebar-text-muted uppercase tracking-wider">Projects</h3>
             </div>
           )}
           
           {!isSidebarCollapsed && (
             <div className="px-3 mb-3">
               <div className="relative">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-brand-text-muted" />
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sidebar-text-muted" />
                 <input 
                   type="text" 
                   value={projectSearch}
                   onChange={(e) => setProjectSearch(e.target.value)}
                   placeholder="Filter projects..."
-                  className="w-full bg-brand-bg border border-brand-border rounded-md pl-8 pr-3 py-1.5 text-xs text-brand-text outline-none focus:border-brand-primary transition-colors"
+                  className="w-full bg-sidebar-bg border border-sidebar-border rounded-md pl-8 pr-3 py-1.5 text-xs text-sidebar-text outline-none focus:border-sidebar-text transition-colors"
                 />
               </div>
             </div>
@@ -144,8 +144,8 @@ export const ApplicationSidebar: React.FC = () => {
                   to={`/board/${board.id}`}
                   className={`flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors group ${
                     isActive 
-                      ? 'bg-brand-surface-hover text-brand-primary' 
-                      : 'text-brand-text hover:bg-brand-surface-low'
+                      ? 'bg-sidebar-active text-sidebar-text font-semibold' 
+                      : 'text-sidebar-text hover:bg-sidebar-active/50'
                   }`}
                   title={isSidebarCollapsed ? board.name : undefined}
                 >
@@ -159,7 +159,7 @@ export const ApplicationSidebar: React.FC = () => {
             })}
             
             {filteredBoards.length === 0 && !isSidebarCollapsed && (
-              <div className="px-3 py-2 text-xs text-brand-text-muted">No projects found.</div>
+              <div className="px-3 py-2 text-xs text-sidebar-text-muted">No projects found.</div>
             )}
           </div>
         </div>
@@ -167,7 +167,7 @@ export const ApplicationSidebar: React.FC = () => {
         {/* Administration Section */}
         {user?.role === 'SUPER_ADMIN' && (
           <div className="px-3 mb-6">
-            {!isSidebarCollapsed && <h3 className="px-3 text-xs font-bold text-brand-text-muted uppercase tracking-wider mb-2">Administration</h3>}
+            {!isSidebarCollapsed && <h3 className="px-3 text-xs font-bold text-sidebar-text-muted uppercase tracking-wider mb-2">Administration</h3>}
             <div className="space-y-1">
               <NavItem to="/admin" icon={ShieldAlert} label="Admin Panel" />
             </div>
@@ -176,7 +176,7 @@ export const ApplicationSidebar: React.FC = () => {
       </div>
 
       {/* Footer / Personal */}
-      <div className="p-3 border-t border-brand-border shrink-0">
+      <div className="p-3 border-t border-sidebar-border shrink-0">
         <div className="space-y-1 mb-4">
           <NavItem to="/notifications" icon={Bell} label="Notifications" badge={unreadCount} />
           <NavItem to="/settings/account" icon={Settings} label="Settings" />
@@ -186,8 +186,8 @@ export const ApplicationSidebar: React.FC = () => {
           <UserAvatarDropdown isSidebarCollapsed={isSidebarCollapsed} />
           {!isSidebarCollapsed && (
             <div className="flex-1 min-w-0 flex flex-col">
-              <span className="text-sm font-medium text-brand-text truncate">{formatUserName(user)}</span>
-              <span className="text-xs text-brand-text-muted truncate">{user?.email}</span>
+              <span className="text-sm font-medium text-sidebar-text truncate">{formatUserName(user)}</span>
+              <span className="text-xs text-sidebar-text-muted truncate">{user?.email}</span>
             </div>
           )}
         </div>
@@ -199,15 +199,15 @@ export const ApplicationSidebar: React.FC = () => {
   return (
     <>
       {/* Mobile Hamburger (visible only on small screens) */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-brand-surface border-b border-brand-border flex items-center justify-between px-4 z-40">
+      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-sidebar-bg border-b border-sidebar-border flex items-center justify-between px-4 z-40">
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setIsMobileOpen(true)}
-            className="p-2 -ml-2 rounded-lg text-brand-text-muted hover:bg-brand-surface-low"
+            className="p-2 -ml-2 rounded-lg text-sidebar-text-muted hover:bg-sidebar-active/50"
           >
             <Menu size={20} />
           </button>
-          <span className="font-bold text-brand-text">KAIO</span>
+          <span className="font-bold text-sidebar-text">KAIO</span>
         </div>
       </div>
 
@@ -226,12 +226,12 @@ export const ApplicationSidebar: React.FC = () => {
           transform transition-all duration-300 ease-in-out
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
           ${isSidebarCollapsed ? 'w-16' : 'w-64'}
-          bg-brand-surface
+          bg-sidebar-bg
         `}
       >
         {/* Mobile Close Button */}
         <button 
-          className="md:hidden absolute top-4 right-4 p-2 rounded-lg text-brand-text-muted hover:bg-brand-surface-low z-50"
+          className="md:hidden absolute top-4 right-4 p-2 rounded-lg text-sidebar-text-muted hover:bg-sidebar-active/50 z-50"
           onClick={() => setIsMobileOpen(false)}
         >
           <X size={20} />
@@ -242,7 +242,7 @@ export const ApplicationSidebar: React.FC = () => {
         {/* Desktop Collapse Toggle */}
         <button
           onClick={toggleSidebar}
-          className="hidden md:flex absolute -right-3 top-20 w-6 h-6 bg-brand-surface border border-brand-border rounded-full items-center justify-center text-brand-text-muted hover:text-brand-primary hover:border-brand-primary shadow-sm transition-colors z-50"
+          className="hidden md:flex absolute -right-3 top-20 w-6 h-6 bg-sidebar-bg border border-sidebar-border rounded-full items-center justify-center text-sidebar-text-muted hover:text-sidebar-text shadow-sm transition-colors z-50"
           title={isSidebarCollapsed ? "Expand Sidebar (Ctrl+B)" : "Collapse Sidebar (Ctrl+B)"}
         >
           {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}

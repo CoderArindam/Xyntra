@@ -1,103 +1,102 @@
-from typing import Any, Dict, List, Optional
-import google.generativeai as genai
-from google.generativeai.types import content_types
+from __future__ import annotations
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from google import genai
+
+if TYPE_CHECKING:
+    # pyrefly: ignore [missing-import]
+    from google.genai import types as genai_types
+else:
+    genai_types = genai.types
 
 from app.ai.providers.base import AIProvider
 from app.ai.exceptions import ProviderError, AuthenticationError
 
+
 class GeminiProvider(AIProvider):
-    """Gemini implementation of the AIProvider interface."""
+    """Gemini implementation of the AIProvider interface using google.genai."""
 
     def __init__(self, api_key: str, model: str = "gemini-1.5-flash"):
         super().__init__(api_key, model)
         if not self.api_key:
             raise AuthenticationError("Gemini API key is missing.")
-        genai.configure(api_key=self.api_key, transport="rest")
-        self.client = genai.GenerativeModel(self.model)
+        self.client = genai.Client(api_key=self.api_key)
 
-    def _convert_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        # Gemini format: [{'role': 'user'|'model', 'parts': [...]}]
-        gemini_messages = []
+    def _convert_messages(self, messages: List[Dict[str, Any]]) -> List[genai_types.Content]:
+        contents = []
         for msg in messages:
             role = msg["role"]
             if role == "system":
                 continue
 
             if role == "tool":
-                # Tool responses must be passed back to the model as "user" with function_response part
                 import json
                 try:
                     result_data = json.loads(msg.get("content", "{}"))
-                    # Gemini strictly requires the response to be a dictionary (JSON object)
                     if not isinstance(result_data, dict):
                         result_data = {"result": result_data}
-                except:
+                except Exception:
                     result_data = {"result": msg.get("content", "")}
-                
-                gemini_messages.append({
-                    "role": "user",
-                    "parts": [{
-                        "function_response": {
-                            "name": msg.get("name", "unknown"),
-                            "response": result_data
-                        }
-                    }]
-                })
+
+                contents.append(genai_types.Content(
+                    role="user",
+                    parts=[genai_types.Part(
+                        function_response=genai_types.FunctionResponse(
+                            name=msg.get("name", "unknown"),
+                            response=result_data
+                        )
+                    )]
+                ))
                 continue
-                
+
             gemini_role = "model" if role == "assistant" else "user"
-            
+
             if role == "assistant" and msg.get("tool_calls"):
-                parts = []
-                for tc in msg["tool_calls"]:
-                    parts.append({
-                        "function_call": {
-                            "name": tc["name"],
-                            "args": tc.get("args", {})
-                        }
-                    })
-                gemini_messages.append({
-                    "role": gemini_role,
-                    "parts": parts
-                })
+                parts = [
+                    genai_types.Part(
+                        function_call=genai_types.FunctionCall(
+                            name=tc["name"],
+                            args=tc.get("args", {})
+                        )
+                    )
+                    for tc in msg["tool_calls"]
+                ]
+                contents.append(genai_types.Content(role=gemini_role, parts=parts))
                 continue
 
-            content = msg.get("content", "")
-            gemini_messages.append({
-                "role": gemini_role,
-                "parts": [content]
-            })
-        return gemini_messages
+            contents.append(genai_types.Content(
+                role=gemini_role,
+                parts=[genai_types.Part(text=msg.get("content", ""))]
+            ))
+        return contents
 
-    def _format_tools(self, tools: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
+    def _format_tools(self, tools: Optional[List[Dict[str, Any]]]) -> Optional[List[genai_types.Tool]]:
         if not tools:
             return None
-            
+
         def clean_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
             if not isinstance(schema, dict):
                 return schema
-            cleaned = {}
-            for k, v in schema.items():
-                if k in ["title", "default"]:
-                    continue
-                if isinstance(v, dict):
-                    cleaned[k] = clean_schema(v)
-                elif isinstance(v, list):
-                    cleaned[k] = [clean_schema(item) if isinstance(item, dict) else item for item in v]
-                else:
-                    cleaned[k] = v
-            return cleaned
+            return {
+                k: clean_schema(v) if isinstance(v, dict)
+                else [clean_schema(i) if isinstance(i, dict) else i for i in v] if isinstance(v, list)
+                else v
+                for k, v in schema.items()
+                if k not in ("title", "default")
+            }
 
-        func_decls = []
-        for tool in tools:
-            func = tool.get("function", {})
-            params = func.get("parameters", {})
-            func_decls.append({
-                "name": func.get("name"),
-                "description": func.get("description"),
-                "parameters": clean_schema(params)
-            })
-        return [{"function_declarations": func_decls}]
+        func_decls = [
+            genai_types.FunctionDeclaration(
+                name=tool.get("function", {}).get("name"),
+                description=tool.get("function", {}).get("description"),
+                parameters=clean_schema(tool.get("function", {}).get("parameters", {}))
+            )
+            for tool in tools
+        ]
+        return [genai_types.Tool(function_declarations=func_decls)]
+
+    def _system_instruction(self, messages: List[Dict[str, Any]]) -> Optional[str]:
+        parts = [m["content"] for m in messages if m["role"] == "system"]
+        return "\n".join(parts) if parts else None
 
     async def generate(
         self,
@@ -107,56 +106,44 @@ class GeminiProvider(AIProvider):
         response_format: Optional[Dict[str, Any]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """
-        Generate a response using Gemini API.
-        """
-        system_instruction = "\n".join([m["content"] for m in messages if m["role"] == "system"])
-        history = self._convert_messages([m for m in messages if m["role"] != "system"])
+        contents = self._convert_messages(messages)
+        system = self._system_instruction(messages)
 
-        model = genai.GenerativeModel(
-            model_name=self.model,
-            system_instruction=system_instruction if system_instruction else None,
-            tools=self._format_tools(tools)
+        config = genai_types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+            system_instruction=system,
+            tools=self._format_tools(tools),
         )
-
-        config_kwargs = {
-            "temperature": temperature,
-            "max_output_tokens": max_tokens,
-        }
         if response_format:
-            config_kwargs["response_mime_type"] = "application/json"
-
-        generation_config = genai.types.GenerationConfig(**config_kwargs)
+            config.response_mime_type = "application/json"
 
         try:
-            from google.api_core import retry
-            response = await model.generate_content_async(
-                contents=history,
-                generation_config=generation_config,
-                request_options={"retry": retry.Retry(predicate=lambda e: False), "timeout": 15.0} if hasattr(genai.types, "RequestOptions") else None
+            response = await self.client.aio.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config=config,
             )
-            
+
             content = ""
             tool_calls = []
-            
             if response.candidates:
-                candidate = response.candidates[0]
-                for part in candidate.content.parts:
-                    if hasattr(part, "function_call") and part.function_call:
+                for part in response.candidates[0].content.parts:
+                    if part.function_call:
                         tool_calls.append({
                             "name": part.function_call.name,
                             "args": dict(part.function_call.args)
                         })
-                    elif hasattr(part, "text"):
+                    elif part.text:
                         content += part.text
-            
+
             return {
                 "content": content,
                 "tool_calls": tool_calls,
                 "usage": {
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "total_tokens": 0
+                    "prompt_tokens": getattr(response.usage_metadata, "prompt_token_count", 0),
+                    "completion_tokens": getattr(response.usage_metadata, "candidates_token_count", 0),
+                    "total_tokens": getattr(response.usage_metadata, "total_token_count", 0),
                 }
             }
         except Exception as e:
@@ -169,43 +156,33 @@ class GeminiProvider(AIProvider):
         max_tokens: int = 2000,
         tools: Optional[List[Dict[str, Any]]] = None,
     ):
-        """
-        Stream a response using Gemini API.
-        """
-        system_instruction = "\n".join([m["content"] for m in messages if m["role"] == "system"])
-        history = self._convert_messages([m for m in messages if m["role"] != "system"])
+        contents = self._convert_messages(messages)
+        system = self._system_instruction(messages)
 
-        model = genai.GenerativeModel(
-            model_name=self.model,
-            system_instruction=system_instruction if system_instruction else None,
-            tools=self._format_tools(tools)
-        )
-
-        generation_config = genai.types.GenerationConfig(
+        config = genai_types.GenerateContentConfig(
             temperature=temperature,
             max_output_tokens=max_tokens,
+            system_instruction=system,
+            tools=self._format_tools(tools),
         )
 
         try:
-            from google.api_core import retry
-            response = await model.generate_content_async(
-                contents=history,
-                generation_config=generation_config,
-                stream=True,
-                request_options={"retry": retry.Retry(predicate=lambda e: False), "timeout": 15.0} if hasattr(genai.types, "RequestOptions") else None
-            )
-            
-            async for chunk in response:
-                if chunk.candidates and chunk.candidates[0].content.parts:
-                    part = chunk.candidates[0].content.parts[0]
-                    if hasattr(part, "function_call") and part.function_call:
+            async for chunk in await self.client.aio.models.generate_content_stream(
+                model=self.model,
+                contents=contents,
+                config=config,
+            ):
+                if not chunk.candidates:
+                    continue
+                for part in chunk.candidates[0].content.parts:
+                    if part.function_call:
                         yield {
                             "tool_calls": [{
                                 "name": part.function_call.name,
                                 "args": dict(part.function_call.args)
                             }]
                         }
-                    elif hasattr(part, "text"):
+                    elif part.text:
                         yield {"content": part.text}
         except Exception as e:
             raise ProviderError(f"Gemini API Streaming Error: {str(e)}")

@@ -55,6 +55,8 @@ export type AIEventType =
   | 'execution_completed'
   | 'execution_failed'
   | 'execution_cancelled'
+  | 'preferences_updated'
+  | 'profile_updated'
   | 'error';
 
 export interface AIEvent {

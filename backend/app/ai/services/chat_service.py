@@ -13,7 +13,7 @@ from app.ai.agents.workspace_assistant import WorkspaceAssistantAgent
 from app.ai.context.workspace_context import WorkspaceContextBuilder
 from app.ai.schemas.planning import (
     ExecutionContext, ExecutionPlan, ExecutionResult,
-    ExecutionStatus,
+    ExecutionStatus, StepStatus,
 )
 from app.ai.orchestration.intent_router import IntentRouter, IntentType
 from app.ai.orchestration.planner import Planner
@@ -41,6 +41,7 @@ from app.services.board_service import BoardService
 from app.services.task_service import TaskService
 from app.services.user_service import UserService
 from app.services.comment_service import CommentService
+from app.services.preferences_service import PreferencesService
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +249,7 @@ class AIService:
             "task_service": TaskService(self.conn),
             "user_service": UserService(self.conn),
             "comment_service": CommentService(self.conn),
+            "preferences_service": PreferencesService(self.conn),
             "recent_entities": recent_entities,
         }
 
@@ -297,17 +299,25 @@ class AIService:
         ExecutionStateMachine.validate_transition(exec_context.current_state, execution_result.status)
         exec_context.current_state = execution_result.status
 
-        # --- Emit entity_resolved events ---
+        # --- Emit entity_resolved and preference/profile events ---
         if execution_result.status in [ExecutionStatus.COMPLETED, ExecutionStatus.PARTIALLY_COMPLETED]:
             for step_res in execution_result.step_results:
-                if step_res.status == "success" and step_res.result:
-                    result_data = step_res.result
+                if step_res.status == StepStatus.COMPLETED and step_res.output:
+                    result_data = step_res.output
                     if "task" in result_data and isinstance(result_data["task"], dict) and "id" in result_data["task"]:
                         yield sse_event("entity_resolved", entity_type="task", entity_id=result_data["task"]["id"])
                     elif "board" in result_data and isinstance(result_data["board"], dict) and "id" in result_data["board"]:
                         yield sse_event("entity_resolved", entity_type="board", entity_id=result_data["board"]["id"])
                     elif "board_id" in result_data:
                         yield sse_event("entity_resolved", entity_type="board", entity_id=result_data["board_id"])
+
+                # Emit preference/profile refresh events for any successful step
+                if step_res.status == StepStatus.COMPLETED:
+                    if step_res.action == "update_appearance":
+                        yield sse_event("preferences_updated")
+                    elif step_res.action == "update_profile":
+                        yield sse_event("profile_updated")
+
 
             # --- Compose response ---
             composer = ResponseComposer(self.gateway)

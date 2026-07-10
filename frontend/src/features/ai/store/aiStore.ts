@@ -31,24 +31,36 @@ export const useAIStore = create<AIStore>((set) => ({
   messages: [],
 
   addMessage: (message) => 
-    set((state) => ({ messages: [...state.messages, message] })),
+    set((state) => {
+      // Deduplicate to prevent double-renders of the same message (e.g. strict mode or double-click)
+      if (state.messages.some(m => m.id === message.id)) {
+        return state;
+      }
+      return { messages: [...state.messages, message] };
+    }),
     
   updateLastMessage: (content) =>
     set((state) => {
+      if (state.messages.length === 0) return state;
       const messages = [...state.messages];
-      if (messages.length > 0) {
-        messages[messages.length - 1].content += content;
-      }
+      const lastIndex = messages.length - 1;
+      messages[lastIndex] = {
+        ...messages[lastIndex],
+        content: messages[lastIndex].content + content
+      };
       return { messages };
     }),
 
   updateLastMessageMetadata: (metadata) =>
     set((state) => {
+      if (state.messages.length === 0) return state;
       const messages = [...state.messages];
-      if (messages.length > 0) {
-        const currentMeta = messages[messages.length - 1].metadata || {};
-        messages[messages.length - 1].metadata = { ...currentMeta, ...metadata };
-      }
+      const lastIndex = messages.length - 1;
+      const currentMeta = messages[lastIndex].metadata || {};
+      messages[lastIndex] = {
+        ...messages[lastIndex],
+        metadata: { ...currentMeta, ...metadata }
+      };
       return { messages };
     }),
 

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel
 import time
+from app.ai.schemas.planning import RiskLevel
 
 class BaseTool(ABC):
     """
@@ -18,8 +19,6 @@ class BaseTool(ABC):
     version: str = "1.0"
     is_write_action: bool = False
     
-  
-    from app.ai.schemas.planning import RiskLevel
     risk_level: RiskLevel = RiskLevel.SAFE
     action: str = ""  # The abstract action this tool fulfills (e.g., 'find_project')
 

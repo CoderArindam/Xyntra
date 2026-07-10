@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useUiStore } from './uiStore';
 import { getPreferences, updatePreferences } from '../services/preferencesApi';
 import type { UserPreferences, UserPreferencesUpdate, ThemeType } from '../services/preferencesApi';
 
@@ -38,6 +39,9 @@ export const applyAllPreferences = (prefs: UserPreferences) => {
   applyThemeToDocument(prefs.theme);
   applyAccentColorToDocument(prefs.accent_color);
   applySidebarThemeToDocument(prefs.sidebar_theme);
+  if (prefs.sidebar_collapsed !== undefined) {
+    useUiStore.getState().setSidebarCollapsed(prefs.sidebar_collapsed);
+  }
 };
 
 export const usePreferencesStore = create<PreferencesState>((set, get) => ({

@@ -1,48 +1,70 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useAIStore } from '../store/aiStore';
 import { ChatMessage } from './ChatMessage';
 import { SuggestedPrompts } from './SuggestedPrompts';
+import { ArrowDown } from 'lucide-react';
 
 export const ChatMessages: React.FC = () => {
-  const { messages, isGenerating } = useAIStore();
+  const { messages } = useAIStore();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isAutoScrollPaused, setIsAutoScrollPaused] = useState(false);
 
-  // Auto-scroll to bottom when messages change
+  const scrollToBottom = useCallback((smooth = true) => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+      setIsAutoScrollPaused(false);
+    }
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (!containerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    
+    if (!isNearBottom && !isAutoScrollPaused) {
+      setIsAutoScrollPaused(true);
+    } else if (isNearBottom && isAutoScrollPaused) {
+      setIsAutoScrollPaused(false);
+    }
+  }, [isAutoScrollPaused]);
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!isAutoScrollPaused) {
+      scrollToBottom();
+    }
+  }, [messages, isAutoScrollPaused, scrollToBottom]);
 
   // Filter out system and tool messages
   const visibleMessages = messages.filter(m => m.role === 'user' || m.role === 'assistant');
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      {visibleMessages.length === 0 ? (
-        <SuggestedPrompts />
-      ) : (
-        visibleMessages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} />
-        ))
+    <div className="relative flex-1 flex flex-col overflow-hidden">
+      <div 
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
+      >
+        {visibleMessages.length === 0 ? (
+          <SuggestedPrompts />
+        ) : (
+          visibleMessages.map((msg) => (
+            <ChatMessage key={msg.id} message={msg} />
+          ))
+        )}
+        <div ref={bottomRef} className="h-4" />
+      </div>
+
+      {isAutoScrollPaused && (
+        <button
+          onClick={() => scrollToBottom()}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-brand-surface border border-brand-border shadow-lg rounded-full p-2 text-brand-text hover:text-brand-primary transition-all hover:scale-110 z-10 animate-fade-in-up"
+          aria-label="Scroll to bottom"
+        >
+          <ArrowDown className="w-4 h-4" />
+        </button>
       )}
-      {isGenerating && (
-        <div className="flex justify-start mb-6 animate-fade-in-up">
-          <div className="flex gap-3 max-w-[90%] flex-row">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center shadow-sm border mt-1 bg-gradient-to-br from-indigo-500 to-purple-600 text-white border-purple-500/20">
-              <div className="w-4 h-4 flex items-center justify-center">
-                <span className="flex space-x-1">
-                  <span className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                  <span className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                  <span className="w-1 h-1 bg-white rounded-full animate-bounce"></span>
-                </span>
-              </div>
-            </div>
-            <div className="relative px-5 py-3.5 text-[14px] leading-relaxed shadow-sm bg-brand-surface border border-brand-border text-brand-text rounded-2xl rounded-tl-sm flex items-center">
-              <span className="text-brand-text-muted italic">Processing...</span>
-            </div>
-          </div>
-        </div>
-      )}
-      <div ref={bottomRef} />
     </div>
   );
 };
+

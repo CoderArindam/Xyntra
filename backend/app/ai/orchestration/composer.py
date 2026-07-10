@@ -231,6 +231,47 @@ def _render_get_comments(output):
 
 template_registry.register("get_comments", _render_get_comments)
 
+# --- Profile and Appearance Templates ---
+
+def _render_update_profile(output):
+    if not output or not isinstance(output, dict):
+        return None
+    msg = output.get("message", "Profile updated successfully.")
+    return render_success("Profile Updated", msg)
+
+template_registry.register("update_profile", _render_update_profile)
+
+def _render_get_my_profile(output):
+    if not output or not isinstance(output, dict):
+        return None
+    return render_entity(
+        "Your Profile",
+        output.get("verified", {}),
+        fields=["first_name", "last_name", "email"]
+    )
+
+template_registry.register("get_my_profile", _render_get_my_profile)
+
+def _render_update_appearance(output):
+    if not output or not isinstance(output, dict):
+        return None
+    msg = output.get("message", "Appearance preferences updated.")
+    return render_success("Appearance Updated", msg)
+
+template_registry.register("update_appearance", _render_update_appearance)
+
+def _render_get_my_appearance(output):
+    if not output or not isinstance(output, dict):
+        return None
+    return render_entity(
+        "Appearance Preferences",
+        output.get("verified", {}),
+        fields=["theme", "accent_color", "sidebar_theme", "sidebar_collapsed"]
+    )
+
+template_registry.register("get_my_appearance", _render_get_my_appearance)
+
+
 
 # --- Composer ---
 

@@ -2,6 +2,8 @@ import { useState, useRef, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAIStore } from '../store/aiStore';
 import type { ChatMessage, UIContext } from '../types/ai';
+import { usePreferencesStore } from '../../../store/preferencesStore';
+import { useAuthStore } from '../../../store/authStore';
 
 import api from '../../../lib/axios';
 
@@ -12,6 +14,9 @@ export function useAIChat() {
 
   const sendMessage = useCallback(async (content: string, uiContext?: UIContext, confirmedPlan?: any) => {
     if (!content.trim() && !confirmedPlan) return;
+    
+    // Synchronous lock to prevent duplicate rapid submissions
+    if (useAIStore.getState().isGenerating) return;
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -19,6 +24,8 @@ export function useAIChat() {
 
     abortControllerRef.current = new AbortController();
     
+    let currentMessages = useAIStore.getState().messages;
+
     // Only add user message if it's a new request, not a confirmation
     if (content.trim()) {
       const userMessage: ChatMessage = {
@@ -29,6 +36,7 @@ export function useAIChat() {
         timestamp: new Date().toISOString()
       };
       addMessage(userMessage);
+      currentMessages = [...currentMessages, userMessage];
     }
 
     setIsGenerating(true);
@@ -50,13 +58,7 @@ export function useAIChat() {
     try {
       const payload = {
         conversation_id: conversationId,
-        messages: content.trim() ? [...messages, {
-            id: uuidv4(),
-            conversation_id: conversationId,
-            role: 'user',
-            content,
-            timestamp: new Date().toISOString()
-          }] : messages,
+        messages: currentMessages,
         ui_context: uiContext,
         confirmed_plan: confirmedPlan
       };
@@ -104,8 +106,14 @@ export function useAIChat() {
                   updateLastMessage(data.content);
                 }
                 
-                // Save event to metadata for rendering the timeline/confirmation
                 if (data.v && data.type) {
+                  // Handle preference and profile updates
+                  if (data.type === 'preferences_updated') {
+                    usePreferencesStore.getState().fetchPreferences();
+                  } else if (data.type === 'profile_updated') {
+                    useAuthStore.getState().initAuth();
+                  }
+                  
                   const prevMetadata = useAIStore.getState().messages.find(m => m.id === assistantMessageId)?.metadata || {};
                   
                   let executionStatus = prevMetadata.executionStatus || 'CREATED';

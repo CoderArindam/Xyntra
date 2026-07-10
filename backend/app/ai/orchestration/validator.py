@@ -21,6 +21,16 @@ MISSING_FIELD_QUESTIONS = {
     "add_comment": {
         "content": "What comment would you like to add?",
         "task_name": "Which task are you adding a comment to?"
+    },
+    "update_profile": {
+        "first_name": "What should your new first name be?",
+        "last_name": "What should your new last name be?"
+    },
+    "update_appearance": {
+        "theme": "Would you like Light, Dark, or System theme?",
+        "accent_color": "Which accent color would you like? (Blue, Indigo, Emerald, Rose, Amber)",
+        "sidebar_theme": "Would you like the sidebar Default, Tinted, or Dark?",
+        "sidebar_collapsed": "Would you like the sidebar Expanded or Collapsed?"
     }
 }
 

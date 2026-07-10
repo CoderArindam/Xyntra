@@ -15,6 +15,7 @@ interface UiState {
   setPageTitle: (title: string) => void;
   isSidebarCollapsed: boolean;
   toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -38,6 +39,22 @@ export const useUiStore = create<UiState>((set) => ({
   toggleSidebar: () => set((state) => {
     const newState = !state.isSidebarCollapsed;
     localStorage.setItem('kanban-sidebar-collapsed', String(newState));
+    
+    // Sync with backend if authenticated/preferences loaded
+    // We import dynamically to avoid circular dependency issues during initialization
+    import('./preferencesStore').then(({ usePreferencesStore }) => {
+      const prefsStore = usePreferencesStore.getState();
+      if (prefsStore.preferences) {
+        prefsStore.updatePreferences({ sidebar_collapsed: newState }).catch(console.error);
+      }
+    });
+
     return { isSidebarCollapsed: newState };
+  }),
+  setSidebarCollapsed: (collapsed) => set((state) => {
+    if (state.isSidebarCollapsed === collapsed) return state; // Avoid infinite loops
+
+    localStorage.setItem('kanban-sidebar-collapsed', String(collapsed));
+    return { isSidebarCollapsed: collapsed };
   }),
 }));

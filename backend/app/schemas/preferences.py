@@ -17,10 +17,12 @@ class UserPreferencesUpdate(BaseModel):
     theme: Optional[ThemeEnum] = None
     accent_color: Optional[str] = None
     sidebar_theme: Optional[str] = None
+    sidebar_collapsed: Optional[bool] = None
 
 class UserPreferencesResponse(UserPreferencesBase):
     id: int
     user_id: int
+    sidebar_collapsed: bool
     created_at: datetime
     updated_at: datetime
 

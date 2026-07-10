@@ -17,6 +17,15 @@ class FastAction(BaseModel):
         return any(p.match(text) for p in self._compiled_patterns)
         
     def extract_params(self, text: str) -> Dict[str, Any]:
+        if self.action_name == "update_appearance":
+            t = text.lower()
+            if "dark" in t: return {"theme": "dark"}
+            if "light" in t: return {"theme": "light"}
+            if "system" in t: return {"theme": "system"}
+            if "collapse" in t: return {"sidebar_collapsed": True}
+            if "expand" in t: return {"sidebar_collapsed": False}
+            if "reset" in t or "restore" in t: return {"reset_defaults": True}
+            
         for p in self._compiled_patterns:
             match = p.match(text)
             if match:
@@ -93,4 +102,14 @@ fast_action_registry.register(FastAction(
 fast_action_registry.register(FastAction(
     action_name="get_task_details",
     patterns=[r"^(get|show|fetch) task (\d+)$"]
+))
+
+fast_action_registry.register(FastAction(
+    action_name="update_appearance",
+    patterns=[
+        r"^(switch to|use|enable|set) (dark|light|system)( mode| theme)?$",
+        r"^(collapse|expand) (the )?sidebar$",
+        r"^(make the sidebar|sidebar) (collapsed|expanded)$",
+        r"^(restore|reset) (default|my) (appearance|theme|settings)$",
+    ]
 ))

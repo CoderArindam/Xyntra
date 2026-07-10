@@ -10,7 +10,8 @@ from app.ai.tools.domain_tools import (
     CreateBoardTool, ArchiveBoardTool, DeleteBoardTool,
     AddCommentTool, GetCommentsTool
 )
-
+from app.ai.tools.profile_tools import UpdateProfileTool, GetMyProfileTool
+from app.ai.tools.appearance_tools import UpdateAppearanceTool, GetMyAppearanceTool
 
 class WorkspaceAssistantAgent(BaseAgent):
     """Main assistant agent for handling user workspace queries."""
@@ -33,6 +34,12 @@ class WorkspaceAssistantAgent(BaseAgent):
         # Comments
         AddCommentTool,
         GetCommentsTool,
+        # Profile
+        UpdateProfileTool,
+        GetMyProfileTool,
+        # Appearance
+        UpdateAppearanceTool,
+        GetMyAppearanceTool,
     ]
 
     def build_messages(self, user_input: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
