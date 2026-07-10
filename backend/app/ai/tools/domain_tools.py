@@ -11,7 +11,6 @@ from app.services.task_service import TaskService
 from app.schemas.task import TaskCreate, TaskUpdate, TaskAssigneeUpdate
 from app.ai.schemas.planning import RiskLevel
 from app.ai.tools.fuzzy import resolve_board, resolve_user, resolve_column
-from app.ai.tools.registry import tool_registry
 
 def _serialize(data: Any) -> Any:
     from datetime import datetime, date
@@ -32,24 +31,38 @@ def _serialize(data: Any) -> Any:
 
 async def resolve_board_id(board_id: Optional[int], board_name: Optional[str],
                            current_user: dict, services: Dict[str, Any]) -> int:
-    """Resolve board_id from board_name using fuzzy matching if needed."""
+    """Helper to resolve a board by ID or name"""
+    board_service = services["board_service"]
+    
     if board_id:
         return board_id
+        
     if not board_name:
         raise ValueError("Either board_id or board_name must be provided")
-    
-    board_service = services.get("board_service")
+        
+    # Intercept pronouns
+    if board_name.lower() in ["here", "this project", "that board", "it", "this"]:
+        recent_entities = services.get("recent_entities", {})
+        if "board" in recent_entities:
+            return recent_entities["board"]["entity_id"]
+        
     boards = await board_service.get_user_boards(include_archived=False, current_user=current_user)
     match = resolve_board(board_name, boards)
     if not match:
+        if not boards:
+            raise ValueError(f"You don't have access to any projects. Please create one or request access first.")
         available = ", ".join(b.name for b in boards[:10])
-        raise ValueError(f"Could not find board '{board_name}'. Available boards: {available}")
+        raise ValueError(f"Could not resolve board '{board_name}'. Available boards: {available if available else '(empty)'}")
+        
     return match.id
 
 
 async def resolve_assignee_id(assignee_name: str, current_user: dict,
                               services: Dict[str, Any]) -> int:
     """Resolve assignee name to user ID using fuzzy matching."""
+    if assignee_name.lower() in ["me", "my", "mine", "myself", "i"]:
+        return current_user.get("id")
+        
     user_service = services.get("user_service")
     users = await user_service.get_all_users(current_user=current_user)
     match = resolve_user(assignee_name, users)
@@ -90,9 +103,15 @@ async def resolve_task_id(params, current_user: dict, services: Dict[str, Any]) 
     if getattr(params, "task_id", None):
         return params.task_id
     
-    task_name = getattr(params, "task_name", None) or getattr(params, "title", None)
+    task_name = getattr(params, "task_name", None) or getattr(params, "title", None) or getattr(params, "task_title", None)
     if not task_name:
         raise ValueError("Must provide either task_id or task_name")
+        
+    # Intercept pronouns
+    if task_name.lower() in ["it", "this", "that", "this task", "that one", "the task"]:
+        recent_entities = services.get("recent_entities", {})
+        if "task" in recent_entities:
+            return recent_entities["task"]["entity_id"]
     
     board_service = services.get("board_service")
     task_service = services.get("task_service")
@@ -114,7 +133,8 @@ async def resolve_task_id(params, current_user: dict, services: Dict[str, Any]) 
         best_score = 0.0
         for t in board_data.tasks:
             score = fuzzy_score(task_name, t.title)
-            if score > best_score:
+            # Tie breaker: if scores are equal, prefer the task with the higher ID (more recently created)
+            if score > best_score or (score == best_score and best_score >= 0.5 and best_task and t.id > best_task.id):
                 best_score = score
                 best_task = t
         if best_task and best_score >= 0.5:
@@ -130,9 +150,10 @@ async def resolve_task_id(params, current_user: dict, services: Dict[str, Any]) 
         board_data = await task_service.get_board_tasks(board_id=b.id, assigned_to=None, current_user=current_user)
         for t in board_data.tasks:
             score = fuzzy_score(task_name, t.title)
-            if score > best_score:
+            if score > best_score or (score == best_score and best_score >= 0.5 and best_task and t.id > best_task.id):
                 best_score = score
                 best_task = t
+                
     if best_task and best_score >= 0.5:
         return best_task.id
     raise ValueError(f"Could not find task '{task_name}' in any board.")
@@ -143,14 +164,16 @@ async def resolve_task_id(params, current_user: dict, services: Dict[str, Any]) 
 # -----------------
 
 class CreateTaskParams(BaseModel):
-    board_id: Optional[int] = Field(None, description="ID of the board to create the task in")
-    board_name: Optional[str] = Field(None, description="The name of the board/project (if ID is unknown)")
-    title: str = Field(..., description="Title of the task")
-    description: Optional[str] = Field(None, description="Detailed description of the task")
-    status: str = Field("TODO", description="Status of the task (e.g. TODO, IN_PROGRESS, DONE)")
-    priority: str = Field("Medium", description="Priority of the task (e.g. Low, Medium, High)")
-    assignee_name: Optional[str] = Field(None, description="The first name, last name, or email of the person to assign the task to")
-    due_date: Optional[str] = Field(None, description="ISO format date string for when the task is due (e.g. 2026-12-31T23:59:59Z)")
+    model_config = {"populate_by_name": True}
+    board_id: Optional[int] = Field(None, description="The ID of the board")
+    board_name: Optional[str] = Field(None, alias="name", description="The name of the board (if ID is unknown)")
+    title: str = Field(..., description="The title of the task")
+    description: Optional[str] = Field(None, description="Detailed description")
+    status: Optional[str] = Field(None, description="Status (e.g., TODO, IN_PROGRESS, DONE)")
+    priority: Optional[str] = Field(None, description="Priority (LOW, MEDIUM, HIGH)")
+    assignee_id: Optional[int] = Field(None, description="The ID of the user to assign the task to")
+    assignee_name: Optional[str] = Field(None, alias="assignee", description="The name or email of the user to assign (if ID is unknown)")
+    due_date: Optional[str] = Field(None, description="Due date in ISO 8601 format (e.g., 2026-12-31T00:00:00Z)")
 
 
 class CreateTaskTool(BaseTool):
@@ -317,8 +340,10 @@ class DeleteTaskTool(BaseTool):
 # -----------------
 
 class CreateBoardParams(BaseModel):
-    name: str = Field(..., description="Name of the board/project to create")
-    description: Optional[str] = Field(None, description="Description of the board/project")
+    model_config = {"populate_by_name": True}
+    name: str = Field(..., alias="board_name", description="The name of the new board")
+    project_key: Optional[str] = Field(None, description="Optional short key for the board (e.g. 'PRJ')")
+    description: Optional[str] = Field(None, description="Optional description of the board")
 
 
 class CreateBoardTool(BaseTool):
@@ -405,12 +430,13 @@ class DeleteBoardTool(BaseTool):
 # Comment Tools
 # -----------------
 
+
 class AddCommentParams(BaseModel):
     model_config = {"populate_by_name": True}
-    task_id: Optional[int] = Field(None, description="ID of the task")
-    task_name: Optional[str] = Field(None, description="Name of the task")
+    task_id: Optional[int] = Field(None, description="The ID of the task")
+    task_name: Optional[str] = Field(None, alias="title", description="The name of the task (if ID is unknown)")
     board_name: Optional[str] = Field(None, description="Name of the board")
-    content: str = Field(..., alias="comment", description="The markdown content of the comment")
+    content: str = Field(..., alias="comment", description="The comment content")
 
 class AddCommentTool(BaseTool):
     name: str = "add_comment"
@@ -466,15 +492,4 @@ class GetCommentsTool(BaseTool):
             "warnings": []
         }
 
-# -----------------
-# Register all tools
-# -----------------
-tool_registry.register(CreateTaskTool())
-tool_registry.register(UpdateTaskTool())
-tool_registry.register(DeleteTaskTool())
-tool_registry.register(CreateBoardTool())
-tool_registry.register(ArchiveBoardTool())
-tool_registry.register(DeleteBoardTool())
-tool_registry.register(AddCommentTool())
-tool_registry.register(GetCommentsTool())
 

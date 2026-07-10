@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from app.auth.dependencies import get_current_user
 from app.database.connection import get_db_connection
 from app.schemas.activity import CanonicalActivityResponse
-from app.schemas.common import DataEnvelope
+from app.schemas.envelope import DataEnvelope
 from app.services.activity_service import ActivityService
 
 logger = logging.getLogger(__name__)

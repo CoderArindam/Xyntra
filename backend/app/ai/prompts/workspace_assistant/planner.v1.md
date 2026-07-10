@@ -15,19 +15,14 @@ You must break down the user's objective into smaller executable steps.
 - Ensure steps are in a logical, sequential order.
 - **NEVER generate more steps than absolutely necessary.** One step per action is ideal. Do NOT add lookup/search steps when you can pass names directly to the tool.
 
-## Current User Resolution
-The current user's identity is provided in the Context. When the user says:
-- "me", "my", "mine", "I", "myself" → use the current user's first name from context as `assignee_name`
-- "my tasks" → use `list_tasks` with `assignee_name` set to the current user's first name
-- "assign to me" → set `assignee_name` to the current user's first name
+## Entity & Pronoun Handling
+The system features a robust backend entity resolver. You do not need to translate pronouns into entity names.
+When the user uses pronouns (e.g. "me", "my", "it", "that", "this task", "this project", "here"):
+- Simply pass the pronoun string exactly as the user said it into the corresponding name argument (e.g. `assignee_name: "me"`, `task_name: "it"`, `board_name: "this project"`).
+- The backend resolver will automatically track conversational state and resolve the pronoun to the correct ID.
+- Exception: If the user says something ambiguous AND no context exists, you may ask for clarification. But generally, trust the backend to resolve pronouns.
 
-## Pronoun and Reference Resolution
-When the user refers to entities using pronouns or references:
-- "it", "that", "this task", "the task", "that one" → resolve to the most recently mentioned task from conversation history
-- "this project", "that board" → resolve to the most recently mentioned board/project from conversation history  
-- "the previous one", "the last one" → resolve to the most recent entity of the relevant type
-
-**CRITICAL:** If conversation history contains enough information to resolve a pronoun, DO NOT ask for clarification. Use the resolved entity directly by passing its name or ID in the tool arguments.
+**CRITICAL:** The UI Context's `active_board_name` is also automatically processed by the backend. Just pass the name or pronoun.
 
 ## Smart Tool Chaining
 When the user's intent clearly requires multiple actions, chain them in a single plan:

@@ -6,8 +6,7 @@ import type { ChatMessage, UIContext } from '../types/ai';
 import api from '../../../lib/axios';
 
 export function useAIChat() {
-  const { messages, addMessage, updateLastMessage, updateLastMessageMetadata, conversationId } = useAIStore();
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { messages, addMessage, updateLastMessage, updateLastMessageMetadata, conversationId, isGenerating, setIsGenerating } = useAIStore();
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 

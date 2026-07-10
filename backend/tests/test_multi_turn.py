@@ -8,7 +8,7 @@ import logging
 logging.basicConfig(level=logging.ERROR)
 
 from app.database.connection import db
-from app.services.ai_service import AIService
+from app.ai.services.chat_service import AIService
 from app.schemas.ai import AIChatRequest, ChatMessage
 import uuid
 

@@ -27,7 +27,7 @@ UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-from app.config.config import settings
+from app.config.settings import settings
 
 origins = [origin.strip() for origin in settings.FRONTEND_ORIGINS.split(",") if origin.strip()]
 

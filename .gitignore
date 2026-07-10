@@ -104,6 +104,7 @@ logs/
 
 backend/uploads/
 backend/archive/
+backend/tests/
 
 # ==========================================================
 # Temporary Files

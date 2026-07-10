@@ -66,7 +66,7 @@ import asyncpg
 from fastapi import HTTPException
 from typing import List, Optional
 from app.schemas.notifications import MarkBatchReadRequest, CanonicalNotificationResponse
-from app.schemas.common import MetaResponse
+from app.schemas.envelope import MetaResponse
 
 class NotificationService:
     def __init__(self, conn: asyncpg.Connection):

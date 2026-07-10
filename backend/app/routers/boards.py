@@ -4,7 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.schemas.board import BoardCreate, CanonicalBoardResponse, ProjectSettingsResponse, ProjectSettingsUpdate
-from app.schemas.common import DataEnvelope
+from app.schemas.envelope import DataEnvelope
 from app.auth.dependencies import get_current_user
 from app.auth.permissions import require_manager_or_above
 from app.database.connection import get_db_connection

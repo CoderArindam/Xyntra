@@ -1,1 +1,1 @@
-# Config package
+# App configuration package

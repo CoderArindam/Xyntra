@@ -18,7 +18,7 @@ class BaseTool(ABC):
     version: str = "1.0"
     is_write_action: bool = False
     
-    # Execution Metadata for Phase 3.3
+  
     from app.ai.schemas.planning import RiskLevel
     risk_level: RiskLevel = RiskLevel.SAFE
     action: str = ""  # The abstract action this tool fulfills (e.g., 'find_project')

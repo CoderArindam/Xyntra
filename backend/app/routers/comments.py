@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, BackgroundTasks
 
 from app.schemas.comments import CommentCreate, CommentResponse
-from app.schemas.common import DataEnvelope
+from app.schemas.envelope import DataEnvelope
 from app.services.notification_service import dispatch_task_email
 from app.auth.dependencies import get_current_user
 from app.database.connection import get_db_connection

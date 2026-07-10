@@ -13,6 +13,7 @@ class WorkspaceContextBuilder(BaseContextBuilder):
         self.conn = conn
 
     async def build(self, current_user: dict, board_id: int = None, **kwargs: Any) -> Dict[str, Any]:
+        print('Current user from workspace_context.py file', current_user)
         first_name = current_user.get('first_name', '')
         last_name = current_user.get('last_name', '')
         email = current_user.get('email', '')
@@ -30,6 +31,13 @@ class WorkspaceContextBuilder(BaseContextBuilder):
         except Exception:
             pass
         
+        active_board_name = None
+        if board_id:
+            for b in board_names:
+                if b["id"] == board_id:
+                    active_board_name = b["name"]
+                    break
+                    
         context = {
             "current_user": f"{first_name} {last_name} ({email})",
             "current_user_first_name": first_name,
@@ -37,6 +45,7 @@ class WorkspaceContextBuilder(BaseContextBuilder):
             "current_user_email": email,
             "current_user_id": user_id,
             "current_board_id": board_id if board_id else "None",
+            "active_board_name": active_board_name,
             "available_boards": board_names,
         }
         

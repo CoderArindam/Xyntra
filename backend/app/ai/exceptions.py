@@ -58,6 +58,13 @@ class ValidationError(AIError):
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
         super().__init__(message, category=FailureCategory.VALIDATION_ERROR, details=details)
 
+class MissingInformationError(AIError):
+    """Raised when the AI plan cannot proceed due to missing user-provided required fields."""
+    def __init__(self, message: str, plan: Optional[Any] = None, missing_fields: Optional[list[str]] = None, details: Optional[Dict[str, Any]] = None):
+        super().__init__(message, category=FailureCategory.VALIDATION_ERROR, details=details)
+        self.plan = plan
+        self.missing_fields = missing_fields or []
+
 class ToolResolutionError(AIError):
     """Raised when a tool cannot be resolved or found."""
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):

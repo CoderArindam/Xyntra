@@ -2,8 +2,7 @@ import logging
 from typing import Any, Dict, List, Optional, Type
 from pydantic import BaseModel, ValidationError
 
-from app.config.config import settings
-from app.ai.config import is_ai_enabled, get_provider, get_model, get_provider_api_key
+from app.ai.config.settings import ai_settings
 from app.ai.exceptions import AIError, ProviderError, ParsingError
 from app.ai.providers.base import AIProvider
 from app.ai.providers.openai import OpenAIProvider
@@ -18,18 +17,15 @@ import json
 logger = logging.getLogger("ai.gateway")
 
 class AIGateway:
-    """
-    Central AI Gateway responsible for routing, retries, rate limiting, and telemetry.
-    Designed to be injected via Dependency Injection.
-    """
+    """Central AI Gateway responsible for routing, retries, rate limiting, and telemetry."""
     
     def __init__(self):
-        self.provider_name = get_provider()
-        self.model_name = get_model()
+        self.provider_name = ai_settings.AI_PROVIDER
+        self.model_name = ai_settings.AI_MODEL
         self.provider = self._init_provider()
         
     def _init_provider(self) -> AIProvider:
-        api_key = get_provider_api_key(self.provider_name) or ""
+        api_key = self._get_provider_api_key(self.provider_name) or ""
         if self.provider_name.lower() == "openai":
             return OpenAIProvider(api_key=api_key, model=self.model_name)
         elif self.provider_name.lower() == "gemini":
@@ -37,11 +33,25 @@ class AIGateway:
         elif self.provider_name.lower() == "puter":
             return PuterProvider(api_key=api_key, model=self.model_name)
         else:
-            # Fallback
             return GeminiProvider(api_key=api_key, model=self.model_name)
 
+    @staticmethod
+    def _get_provider_api_key(provider: str) -> str | None:
+        provider = provider.lower()
+        if provider == "openai":
+            return ai_settings.OPENAI_API_KEY
+        elif provider == "anthropic":
+            return ai_settings.ANTHROPIC_API_KEY
+        elif provider == "gemini":
+            return ai_settings.GEMINI_API_KEY
+        elif provider == "azure":
+            return ai_settings.AZURE_OPENAI_KEY
+        elif provider == "puter":
+            return ai_settings.PUTER_API_KEY
+        return None
+
     def _check_feature_flags(self, org_ai_enabled: bool, user_has_permission: bool):
-        if not is_ai_enabled():
+        if not ai_settings.AI_ENABLED:
             raise AIError("AI features are globally disabled.")
         if not org_ai_enabled:
             raise AIError("AI features are disabled for this organization.")
@@ -70,8 +80,8 @@ class AIGateway:
             async def do_call():
                 response = await self.provider.generate(
                     messages=messages,
-                    temperature=settings.AI_TEMPERATURE,
-                    max_tokens=settings.AI_MAX_TOKENS,
+                    temperature=ai_settings.AI_TEMPERATURE,
+                    max_tokens=ai_settings.AI_MAX_TOKENS,
                     tools=tools
                 )
                 
@@ -157,8 +167,8 @@ class AIGateway:
             try:
                 stream_gen = self.provider.stream(
                     messages=messages,
-                    temperature=settings.AI_TEMPERATURE,
-                    max_tokens=settings.AI_MAX_TOKENS,
+                    temperature=ai_settings.AI_TEMPERATURE,
+                    max_tokens=ai_settings.AI_MAX_TOKENS,
                     tools=tools
                 )
                 

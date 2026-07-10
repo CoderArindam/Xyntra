@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.schemas.my_work import MyWorkSummaryResponse
 from app.schemas.task import CanonicalTaskResponse
-from app.schemas.common import DataEnvelope
+from app.schemas.envelope import DataEnvelope
 from app.auth.dependencies import get_current_user
 from app.database.connection import get_db_connection
 from app.services.my_work_service import MyWorkService

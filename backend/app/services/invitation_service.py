@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from app.schemas.invitations import InviteUserRequest, AcceptInvitationRequest
 from app.auth.password import get_password_hash
 from app.services.email_service import send_email
-from app.config.config import settings
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 

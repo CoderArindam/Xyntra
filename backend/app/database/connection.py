@@ -1,6 +1,6 @@
 import asyncpg
 from typing import AsyncGenerator
-from app.config.config import settings
+from app.config.settings import settings
 
 import json
 

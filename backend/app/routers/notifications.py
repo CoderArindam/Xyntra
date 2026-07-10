@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from app.auth.dependencies import get_current_user
 from app.database.connection import get_db_connection
 from app.schemas.notifications import MarkBatchReadRequest, CanonicalNotificationResponse
-from app.schemas.common import DataEnvelope
+from app.schemas.envelope import DataEnvelope
 from app.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)

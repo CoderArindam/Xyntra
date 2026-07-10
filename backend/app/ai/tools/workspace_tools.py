@@ -2,7 +2,6 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 from app.ai.tools.base import BaseTool
 from app.ai.tools.fuzzy import resolve_board, resolve_user
-from app.ai.tools.registry import tool_registry
 
 
 # --- List Boards Tool ---
@@ -29,10 +28,11 @@ class ListBoardsTool(BaseTool):
 
 # --- List Tasks Tool ---
 class ListTasksInput(BaseModel):
+    model_config = {"populate_by_name": True}
     board_id: Optional[int] = Field(None, description="The ID of the board to list tasks for")
-    board_name: Optional[str] = Field(None, description="The name of the board (if ID is unknown)")
+    board_name: Optional[str] = Field(None, alias="name", description="The name of the board (if ID is unknown)")
     status: Optional[str] = Field(None, description="Filter tasks by status (e.g. 'In Progress', 'Done', 'To Do')")
-    assignee_name: Optional[str] = Field(None, description="Filter tasks by assignee name. Use the current user's name to filter 'my tasks'.")
+    assignee_name: Optional[str] = Field(None, alias="assignee", description="Filter tasks by assignee name. Use the current user's name to filter 'my tasks'.")
     priority: Optional[str] = Field(None, description="Filter tasks by priority (e.g. 'High', 'Medium', 'Low')")
     overdue: Optional[bool] = Field(None, description="If true, only return tasks that are overdue (due_date is in the past and task is not completed).")
 
@@ -52,13 +52,16 @@ class ListTasksTool(BaseTool):
         # Resolve assignee
         assigned_to = None
         if params.assignee_name:
-            user_service = services.get("user_service")
-            users = await user_service.get_all_users(current_user=current_user)
-            match = resolve_user(params.assignee_name, users)
-            if match:
-                assigned_to = match.get("id")
+            if params.assignee_name.lower() in ["me", "my", "mine", "myself", "i"]:
+                assigned_to = current_user.get("id")
             else:
-                raise ValueError(f"Could not resolve assignee '{params.assignee_name}' to a valid user in this workspace.")
+                user_service = services.get("user_service")
+                users = await user_service.get_all_users(current_user=current_user)
+                match = resolve_user(params.assignee_name, users)
+                if match:
+                    assigned_to = match.get("id")
+                else:
+                    raise ValueError(f"Could not resolve assignee '{params.assignee_name}' to a valid user in this workspace.")
         
         # Resolve board
         board_id = params.board_id
@@ -141,8 +144,9 @@ class GetWorkspaceUsersTool(BaseTool):
 
 # --- Get Task Tool ---
 class GetTaskInput(BaseModel):
+    model_config = {"populate_by_name": True}
     task_id: Optional[int] = Field(None, description="The ID of the task to retrieve (if known)")
-    task_name: Optional[str] = Field(None, description="The name of the task to retrieve")
+    task_name: Optional[str] = Field(None, alias="title", description="The name of the task to retrieve")
     board_name: Optional[str] = Field(None, description="The name of the board containing the task")
 
 
@@ -243,10 +247,3 @@ class GetBoardSummaryTool(BaseTool):
             "member_count": member_count
         }
 
-
-# --- Register all workspace tools ---
-tool_registry.register(ListBoardsTool())
-tool_registry.register(ListTasksTool())
-tool_registry.register(GetWorkspaceUsersTool())
-tool_registry.register(GetTaskTool())
-tool_registry.register(GetBoardSummaryTool())

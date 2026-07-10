@@ -1,16 +1,13 @@
 import contextvars
 from typing import Optional
-from contextlib import contextmanager
 import uuid
 import time
 from .events import EventType
 from .bus import telemetry_bus
 
-# Context variables for distributed tracing within a single process
 _request_id = contextvars.ContextVar("request_id", default=None)
 _execution_id = contextvars.ContextVar("execution_id", default=None)
 _span_id = contextvars.ContextVar("span_id", default=None)
-# State for request tracking (to gather total metrics)
 _request_state = contextvars.ContextVar("request_state", default=None)
 
 class TraceContext:
@@ -57,56 +54,6 @@ class TraceContext:
     def increment_metric(metric: str, value: int = 1):
         state = TraceContext.get_state()
         state[metric] = state.get(metric, 0) + value
-
-@contextmanager
-def trace_request(request_id: str, execution_id: str):
-    """Context manager for the entire request lifecycle."""
-    token_req = _request_id.set(request_id)
-    token_exec = _execution_id.set(execution_id)
-    token_span = _span_id.set(None)
-    token_state = _request_state.set({
-        "total_llm_calls": 0,
-        "total_tokens": 0,
-        "tools_executed": 0,
-        "services_invoked": 0,
-        "total_retries": 0,
-        "start_time": time.time()
-    })
-    
-    telemetry_bus.publish(
-        event_type=EventType.REQUEST_STARTED,
-        request_id=request_id,
-        execution_id=execution_id,
-        metadata={"start_time": time.time()}
-    )
-    
-    try:
-        yield
-    except Exception as e:
-        telemetry_bus.publish(
-            event_type=EventType.ERROR_OCCURRED,
-            request_id=request_id,
-            execution_id=execution_id,
-            metadata={"component": "Request", "message": str(e), "exception_type": e.__class__.__name__}
-        )
-        raise
-    finally:
-        state = _request_state.get()
-        duration_ms = int((time.time() - state["start_time"]) * 1000)
-        state["duration_ms"] = duration_ms
-        state["status"] = "success" # We don't catch here, so if it reaches here and doesn't raise, it's success or handled error
-        
-        telemetry_bus.publish(
-            event_type=EventType.REQUEST_COMPLETED,
-            request_id=request_id,
-            execution_id=execution_id,
-            metadata=state
-        )
-        
-        _request_id.reset(token_req)
-        _execution_id.reset(token_exec)
-        _span_id.reset(token_span)
-        _request_state.reset(token_state)
 
 class Span:
     """A context manager representing a single unit of work."""

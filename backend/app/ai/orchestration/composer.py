@@ -37,8 +37,16 @@ class TemplateRegistry:
                 if rendered:
                     parts.append(rendered)
                     
-        if parts:
-            return "\n\n".join(parts)
+        # Filter out empty list messages ("You don't have any...") if there's already a successful mutation
+        final_parts = []
+        has_mutation = any("successfully" in p.lower() or "added" in p.lower() or "created" in p.lower() or "deleted" in p.lower() for p in parts)
+        for p in parts:
+            if has_mutation and ("you don't have any" in p.lower() or "no tasks found" in p.lower() or "no comments found" in p.lower()):
+                continue
+            final_parts.append(p)
+            
+        if final_parts:
+            return "\n\n".join(final_parts)
             
         return None
 

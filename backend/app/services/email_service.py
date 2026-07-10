@@ -2,7 +2,7 @@ import smtplib
 import logging
 from email.message import EmailMessage
 
-from app.config.config import settings
+from app.config.settings import settings
 
 
 logger = logging.getLogger(__name__)
@@ -43,9 +43,7 @@ def send_email(to_email: str, subject: str, body_text: str) -> bool:
             server.send_message(msg)
 
 
-        print(
-            f"Email sent to {to_email}"
-        )
+        logger.info(f"Email sent to {to_email}")
 
         return True
 

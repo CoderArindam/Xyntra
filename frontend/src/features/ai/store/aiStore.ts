@@ -7,6 +7,9 @@ interface AIStore {
   setIsOpen: (isOpen: boolean) => void;
   toggleOpen: () => void;
 
+  isGenerating: boolean;
+  setIsGenerating: (isGenerating: boolean) => void;
+
   conversationId: string;
   messages: ChatMessage[];
   
@@ -20,6 +23,9 @@ export const useAIStore = create<AIStore>((set) => ({
   isOpen: false,
   setIsOpen: (isOpen) => set({ isOpen }),
   toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
+
+  isGenerating: false,
+  setIsGenerating: (isGenerating) => set({ isGenerating }),
 
   conversationId: uuidv4(),
   messages: [],

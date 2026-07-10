@@ -3,7 +3,7 @@ from typing import List, Optional
 import asyncpg
 from fastapi import HTTPException
 from app.schemas.activity import CanonicalActivityResponse
-from app.schemas.common import MetaResponse
+from app.schemas.envelope import MetaResponse
 
 logger = logging.getLogger(__name__)
 
