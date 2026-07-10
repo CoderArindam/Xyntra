@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Type
 from pydantic import BaseModel, ValidationError
 
 from app.ai.config.settings import ai_settings
-from app.ai.exceptions import AIError, ProviderError, ParsingError
+from app.ai.exceptions import AIError, ProviderError, ParsingError, PermissionError
 from app.ai.providers.base import AIProvider
 from app.ai.providers.openai import OpenAIProvider
 from app.ai.providers.gemini import GeminiProvider
@@ -51,12 +51,13 @@ class AIGateway:
         return None
 
     def _check_feature_flags(self, org_ai_enabled: bool, user_has_permission: bool):
+        print("user has permission", user_has_permission, "from ai_gateway.py file")
         if not ai_settings.AI_ENABLED:
             raise AIError("AI features are globally disabled.")
         if not org_ai_enabled:
             raise AIError("AI features are disabled for this organization.")
         if not user_has_permission:
-            raise AIError("User does not have permission to use AI features.")
+            raise PermissionError("You do not have permission to use AI features.")
 
     async def execute_prompt(
         self,

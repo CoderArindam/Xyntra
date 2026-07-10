@@ -18,7 +18,7 @@ class ClarificationRouter:
     def __init__(self, gateway: AIGateway):
         self.gateway = gateway
 
-    async def resolve(self, user_input: str, pending_plan: ExecutionPlan, missing_fields: list[str], request_id: str, organization_id: str, user_id: str) -> ClarificationDecision:
+    async def resolve(self, user_input: str, pending_plan: ExecutionPlan, missing_fields: list[str], request_id: str, organization_id: str, user_id: str, user_has_permission: bool = False) -> ClarificationDecision:
         with Span("Resolve Clarification", "ClarificationRouter") as span:
             system_prompt = f"""You are routing a user's response to a pending clarification question.
 
@@ -49,7 +49,7 @@ Return a JSON object matching this schema:
             result = await self.gateway.execute_prompt(
                 messages=messages,
                 org_ai_enabled=True,
-                user_has_permission=True,
+                user_has_permission=user_has_permission,
                 response_schema=ClarificationDecision,
                 workflow_id="clarification_resolution",
                 request_id=request_id,

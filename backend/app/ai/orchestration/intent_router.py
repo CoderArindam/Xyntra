@@ -4,6 +4,7 @@ from typing import Dict, Any, Type
 from pydantic import BaseModel, Field
 from app.ai.gateway.ai_gateway import AIGateway
 from app.ai.prompts.registry import PromptRegistry
+from app.ai.exceptions import PermissionError
 
 class IntentType(str, Enum):
     CONVERSATIONAL = "CONVERSATIONAL"
@@ -41,7 +42,8 @@ class IntentRouter:
             
         return None
         
-    async def classify(self, user_input: str, request_id: str, organization_id: str, user_id: str, llm_context: str = None) -> IntentType:
+    async def classify(self, user_input: str, request_id: str, organization_id: str, user_id: str, llm_context: str = None, user_has_permission = False) -> IntentType:
+        print("user has permission", user_has_permission, "from intent_router.py file")
         """
         Classifies the intent, returning one of CONVERSATIONAL, KNOWLEDGE, or WORKSPACE_ACTION.
         Uses a two-stage approach: fast heuristics first, then LLM.
@@ -74,7 +76,7 @@ class IntentRouter:
                     messages=messages,
                     response_schema=IntentClassification,
                     org_ai_enabled=True,
-                    user_has_permission=True,
+                    user_has_permission=user_has_permission,
                     workflow_id="intent_routing",
                     request_id=request_id,
                     organization_id=organization_id,
@@ -90,6 +92,8 @@ class IntentRouter:
                     span.metadata["method"] = "llm_fallback"
                     return IntentType.WORKSPACE_ACTION # Safe fallback
             except Exception as e:
+                if isinstance(e, PermissionError):
+                    raise
                 # Fallback to WORKSPACE_ACTION if classification fails, planner can figure it out
                 span.metadata["intent"] = IntentType.WORKSPACE_ACTION.value
                 span.metadata["method"] = "error_fallback"

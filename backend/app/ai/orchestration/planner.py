@@ -4,6 +4,7 @@ from app.ai.schemas.planning import ExecutionPlan, ExecutionContext
 from app.ai.tools.base import BaseTool
 from app.ai.gateway.ai_gateway import AIGateway
 from app.ai.prompts.registry import PromptRegistry
+from app.ai.exceptions import AIError
 
 class Planner:
     """
@@ -61,7 +62,7 @@ class Planner:
                     messages=messages,
                     response_schema=ExecutionPlan,
                     org_ai_enabled=True,
-                    user_has_permission=True,
+                    user_has_permission=context.current_user.get("role") in ["SUPER_ADMIN", "MANAGER"],
                     workflow_id="planning",
                     request_id=context.request_id,
                     organization_id=context.organization_id,
@@ -76,4 +77,6 @@ class Planner:
                     raise ValueError("Expected ExecutionPlan, got string.")
                     
             except Exception as e:
+                if isinstance(e, AIError):
+                    raise
                 raise ValueError(f"Failed to parse execution plan: {str(e)}")

@@ -161,7 +161,7 @@ class AIService:
         stream_gen = self.gateway.stream_prompt(
             messages=chat_messages,
             org_ai_enabled=True,
-            user_has_permission=True,
+            user_has_permission=exec_context.current_user.get("role") in ["SUPER_ADMIN", "MANAGER"],
             workflow_id="conversational",
             request_id=exec_context.request_id,
             organization_id=exec_context.organization_id,
@@ -191,6 +191,7 @@ class AIService:
             request_id=exec_context.request_id,
             organization_id=exec_context.organization_id,
             user_id=str(exec_context.current_user.get("id")),
+            user_has_permission=exec_context.current_user.get("role") in ["SUPER_ADMIN", "MANAGER"]
         )
 
         if decision.decision == "CANCEL":
@@ -377,7 +378,9 @@ class AIService:
                     organization_id=exec_context.organization_id,
                     user_id=str(exec_context.current_user.get("id")),
                     llm_context=planner_input,
+                    user_has_permission = exec_context.current_user.get("role") == "SUPER_ADMIN" or exec_context.current_user.get("role") == "MANAGER"
                 )
+
 
             # --- Conversational / Knowledge ---
             if intent in [IntentType.CONVERSATIONAL, IntentType.KNOWLEDGE]:

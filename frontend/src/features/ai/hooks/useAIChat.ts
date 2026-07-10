@@ -94,7 +94,9 @@ export function useAIChat() {
               try {
                 const data = JSON.parse(dataStr);
                 if (data.error || data.type === 'error') {
-                  setError(data.error || 'Execution failed');
+                  const errorMsg = data.error || 'Execution failed';
+                  setError(errorMsg);
+                  updateLastMessage(errorMsg);
                 }
                 
                 // Handle execution content
