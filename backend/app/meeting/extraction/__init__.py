@@ -1,0 +1,1 @@
+"""Task extraction pipeline (placeholder)."""

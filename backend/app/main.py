@@ -6,13 +6,16 @@ import os
 from pathlib import Path
 from app.database.connection import db
 from app.routers import auth, boards, tasks, users, comments, attachments, activity, board_members, admin, invitations, notifications, my_work, preferences, organization, ai
+from app.meeting.api import router as meeting_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     await db.connect()
     yield
-    # Shutdown
+    # Shutdown — cancel all meeting sessions before stopping
+    from app.meeting.api import meeting_service
+    await meeting_service.shutdown_all()
     await db.disconnect()
 
 app = FastAPI(
@@ -55,6 +58,7 @@ app.include_router(my_work.router, prefix="/api/v1")
 app.include_router(preferences.router, prefix="/api/v1")
 app.include_router(organization.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
+app.include_router(meeting_router, prefix="/api/v1")
 
 @app.get("/health", tags=["Health"])
 async def health_check():

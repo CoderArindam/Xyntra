@@ -125,3 +125,8 @@ coverage/
 ```
 .agents/
 docs/
+/backend/storage/meeting
+/backend/tests
+/experiments
+/backend/requirements.lock.after
+D:\kanban-project\backend\requirements.lock.after.txt
