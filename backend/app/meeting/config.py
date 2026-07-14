@@ -68,5 +68,39 @@ class MeetingSettings(BaseSettings):
     MAX_CONCURRENT_SESSIONS: int = 3
     MEETING_TIMEOUT: int = 3600  # seconds — max session duration
 
+    # ------------------------------------------------------------------ #
+    # Pipeline & Processing                                                #
+    # ------------------------------------------------------------------ #
+    STT_PROVIDER: str = "whisper"
+    STT_MULTILINGUAL_ENABLED: bool = True
+    DIARIZATION_PROVIDER: str = "pyannote"
+    INTELLIGENCE_PROVIDER: str = "gemini"
+    TRANSLATION_PROVIDER: str = ""
+    EMBEDDING_PROVIDER: str = ""
+    PIPELINE_CHUNK_DURATION_SEC: int = 30
+    PIPELINE_MAX_RETRIES: int = 3
+    ARTIFACT_RETENTION_DAYS: int = 30
+
+    # ------------------------------------------------------------------ #
+    # Recording                                                            #
+    # ------------------------------------------------------------------ #
+    RECORDING_OUTPUT_DIR: str = str(Path("storage") / "meeting" / "recordings")
+    RECORDING_FORMAT: str = "webm"
+    RECORDING_SAMPLE_RATE: int = 48000
+    RECORDING_MAX_DURATION: int = 14400      # seconds — 4 hours hard cap
+    RECORDING_BUFFER_SIZE: int = 10_485_760  # bytes  — 10 MB in-memory buffer
+    # ------------------------------------------------------------------ #
+    # Audio Processing                                                     #
+    # ------------------------------------------------------------------ #
+    PROCESSING_OUTPUT_DIR: str = str(Path("storage") / "meeting" / "processed_audio")
+    CANONICAL_SAMPLE_RATE: int = 16000       # Hz — optimal for STT
+    CANONICAL_CHANNELS: int = 1             # mono
+    CANONICAL_FORMAT: str = "wav"           # uncompressed for STT fidelity
+    MIN_RECORDING_DURATION: float = 1.0     # seconds — reject very short recordings
+    MAX_RECORDING_SIZE: int = 2_147_483_648 # bytes — 2 GB
+    ENABLE_AUDIO_NORMALIZATION: bool = True
+    FFMPEG_PATH: str = "ffmpeg"
+    FFPROBE_PATH: str = "ffprobe"
+
 
 meeting_config = MeetingSettings()

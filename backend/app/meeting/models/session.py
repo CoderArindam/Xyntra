@@ -140,6 +140,11 @@ class MeetingSession:
     intelligence_alive: bool = False
     observer_health: dict[str, Any] = field(default_factory=dict)
 
+    # ── M2.1 Recording fields ─────────────────────────────────────── #
+    recording_status: str = "none"              # "none" | "recording" | "completed" | "failed"
+    recording_artifact_id: str | None = None
+    recording_duration: float | None = None
+
     def to_dict(self) -> dict:
         return {
             # ── M1 core fields (unchanged) ──
@@ -184,4 +189,8 @@ class MeetingSession:
             "speaker_timeline": [s.to_dict() for s in self.speaker_timeline],
             "intelligence_alive": self.intelligence_alive,
             "observer_health": self.observer_health,
+            # M2.1 recording
+            "recording_status": self.recording_status,
+            "recording_artifact_id": self.recording_artifact_id,
+            "recording_duration": self.recording_duration,
         }

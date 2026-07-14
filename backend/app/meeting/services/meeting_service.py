@@ -23,6 +23,7 @@ from typing import Any
 
 from app.meeting.bot.browser.controller import BrowserController
 from app.meeting.bot.browser.profile_manager import ProfileManager
+from app.meeting.bot.recorder.recorder import MeetingRecorder
 from app.meeting.bot.session.manager import MeetingSessionManager
 from app.meeting.bot.session.monitor import HealthMonitor
 from app.meeting.config import meeting_config
@@ -42,6 +43,7 @@ from app.meeting.intelligence.supervisor import ObserverSupervisor
 from app.meeting.logger import get_logger
 from app.meeting.models.session import JoinState, MeetingSession, SessionStatus, TERMINAL_STATUSES
 from app.meeting.providers import get_provider
+from app.meeting.recording.storage import LocalRecordingStorage
 from app.meeting.utils.debug import DebugCapture
 from app.meeting.utils.playwright_errors import is_playwright_fatal, page_is_usable
 from app.meeting.utils.retry import with_retry
@@ -85,6 +87,10 @@ class MeetingRuntime:
     event_bus: EventBus | None = None
     lifecycle: MeetingLifecycle | None = None
 
+    # Recording (populated after intelligence starts, before RUNNING)
+    recorder: MeetingRecorder | None = None
+    recording_artifact: Any | None = None  # MeetingRecording | None
+
     # Scalable task registry (join_flow, health_monitor, observers, transcription, etc.)
     background_tasks: dict[str, asyncio.Task] = field(default_factory=dict)
     
@@ -120,6 +126,7 @@ class MeetingService:
         self._monitor = HealthMonitor(self._session_manager)
         self._debug = DebugCapture(meeting_config.DEBUG_DIR)
         self._profile_manager = ProfileManager(meeting_config.PROFILE_DIR)
+        self._recording_storage = LocalRecordingStorage(meeting_config.RECORDING_OUTPUT_DIR)
 
         self._runtimes: dict[str, MeetingRuntime] = {}
 
@@ -316,7 +323,10 @@ class MeetingService:
                 )
                 self._session_manager.update_state(session_id, new_status)
                 await self._start_intelligence(session_id, page, runtime)
-                
+
+                # ── Step 5: Start Recording ──────────────────────────── #
+                await self._start_recording(session_id, page, runtime)
+
                 monitor_task = self._monitor.start(
                     session_id, controller, page,
                     supervisor=runtime.supervisor,
@@ -339,7 +349,10 @@ class MeetingService:
                 log.warning("meeting.join.unknown_state — deferring to HealthMonitor", session_id=session_id)
                 self._session_manager.update_state(session_id, SessionStatus.IN_MEETING)
                 await self._start_intelligence(session_id, page, runtime)
-                
+
+                # ── Step 5: Start Recording ──────────────────────────── #
+                await self._start_recording(session_id, page, runtime)
+
                 monitor_task = self._monitor.start(
                     session_id, controller, page,
                     supervisor=runtime.supervisor,
@@ -456,6 +469,38 @@ class MeetingService:
                 pass
         log.info("cleanup.monitor_shutdown.complete", session_id=runtime.session_id, duration_ms=int((time.time() - t_stage) * 1000))
 
+        # 2.5 Stop Recording (must happen before observer shutdown and browser close)
+        t_stage = time.time()
+        log.info("cleanup.recording_stop.start", session_id=runtime.session_id)
+        if runtime.recorder:
+            try:
+                artifact = await asyncio.wait_for(runtime.recorder.stop(), timeout=10.0)
+                if artifact:
+                    runtime.recording_artifact = artifact
+                    session = self._session_manager.get(runtime.session_id)
+                    if session:
+                        session.recording_status = "completed"
+                        session.recording_artifact_id = artifact.id
+                        session.recording_duration = artifact.duration_seconds
+                    log.info(
+                        "recording.completed",
+                        session_id=runtime.session_id,
+                        artifact_id=artifact.id,
+                        duration_seconds=artifact.duration_seconds,
+                        file_size_bytes=artifact.file_size_bytes,
+                    )
+            except asyncio.TimeoutError:
+                log.warning("cleanup.recording_stop.timeout", session_id=runtime.session_id)
+                await runtime.recorder.cancel()
+            except Exception as exc:
+                log.error("cleanup.recording_stop.failed", session_id=runtime.session_id, error=str(exc))
+            finally:
+                try:
+                    await runtime.recorder.cleanup()
+                except Exception:
+                    pass
+        log.info("cleanup.recording_stop.complete", session_id=runtime.session_id, duration_ms=int((time.time() - t_stage) * 1000))
+
         # 3. Stop Observers
         t_stage = time.time()
         log.info("cleanup.observers_stop.start", session_id=runtime.session_id)
@@ -547,6 +592,42 @@ class MeetingService:
             
         runtime._cleanup_finished.set()
         log.info("cleanup.finished", session_id=runtime.session_id, total_duration_ms=int((time.time() - start_time) * 1000))
+
+    # ------------------------------------------------------------------ #
+    # Recording orchestration                                              #
+    # ------------------------------------------------------------------ #
+
+    async def _start_recording(
+        self, session_id: str, page: Any, runtime: MeetingRuntime
+    ) -> None:
+        """Initialize and start the audio recorder.
+
+        Failures are fully isolated — a recording failure never prevents
+        the meeting from continuing or running normally.
+        """
+        try:
+            recorder = MeetingRecorder(storage=self._recording_storage)
+            runtime.recorder = recorder
+            await recorder.initialize(page, session_id, meeting_id=session_id)
+            await recorder.start()
+
+            session = self._session_manager.get(session_id)
+            if session:
+                session.recording_status = "recording"
+
+            log.info("recording.started", session_id=session_id)
+
+        except Exception as exc:
+            log.error(
+                "recording.start_failed",
+                session_id=session_id,
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
+            session = self._session_manager.get(session_id)
+            if session:
+                session.recording_status = "failed"
+            # Never re-raise — recording failure must not affect the meeting
 
     # ------------------------------------------------------------------ #
     # Intelligence orchestration                                           #

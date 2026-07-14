@@ -2,6 +2,12 @@
 
 All meeting loggers follow the `meeting.*` namespace and emit structured
 context fields (session_id, state, elapsed_ms) alongside the message.
+
+Pipeline stage logging should follow these boundaries:
+- `meeting.pipeline.started` / `.completed` / `.failed`
+- `meeting.stage.stt.started` / `.completed`
+- `meeting.stage.diarization.started` / `.completed`
+- `meeting.artifact.generated`
 """
 
 from __future__ import annotations

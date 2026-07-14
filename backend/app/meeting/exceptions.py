@@ -103,3 +103,47 @@ class ProviderNotFoundError(MeetingError):
             recoverable=False,
             retryable=False,
         )
+
+
+class RecordingInitError(MeetingError):
+    """Audio capture could not be initialized (e.g., no audio stream available)."""
+    def __init__(self, message: str) -> None:
+        super().__init__(
+            code="RECORDING_INIT_ERROR",
+            message=message,
+            recoverable=False,
+            retryable=False,
+        )
+
+
+class RecordingWriteError(MeetingError):
+    """Failed to write recording data to storage."""
+    def __init__(self, message: str) -> None:
+        super().__init__(
+            code="RECORDING_WRITE_ERROR",
+            message=message,
+            recoverable=False,
+            retryable=False,
+        )
+
+
+class RecordingValidationError(MeetingError):
+    """Recording failed validation (corrupt, too short, missing audio, etc.)."""
+    def __init__(self, message: str) -> None:
+        super().__init__(
+            code="RECORDING_VALIDATION_ERROR",
+            message=message,
+            recoverable=False,
+            retryable=False,
+        )
+
+
+class AudioProcessingError(MeetingError):
+    """Audio processing/normalization failed (FFmpeg error, IO error, etc.)."""
+    def __init__(self, message: str) -> None:
+        super().__init__(
+            code="AUDIO_PROCESSING_ERROR",
+            message=message,
+            recoverable=False,
+            retryable=True,
+        )
