@@ -4,12 +4,20 @@ from .base import MeetingArtifact
 
 class TranscriptSegment(MeetingArtifact):
     """An individual spoken segment."""
-    timestamp_start: float
-    timestamp_end: float
+    id: str
+    start_time: float
+    end_time: float
+    text: str
+    
+    # Raw Whisper Metrics
+    avg_logprob: float
+    no_speech_probability: float
+    compression_ratio: float
+    
+    # Derived/Abstract Metrics
+    confidence: Optional[float] = None
     speaker: Optional[str] = None
     detected_language: str = "unknown"
-    confidence: float
-    text: str
 
 
 class SpeakerSegment(MeetingArtifact):
@@ -22,8 +30,16 @@ class SpeakerSegment(MeetingArtifact):
 
 class RawTranscript(MeetingArtifact):
     """Initial speech-to-text output before normalization."""
+    parent_processed_audio_id: str
+    detected_language: str
+    language_probability: float
+    model_name: str
+    transcription_started_at: str
+    transcription_completed_at: str
+    transcription_duration_ms: int
     segments: List[TranscriptSegment]
-    provider: str
+    overall_confidence: Optional[float] = None
+    processing_version: str
 
 
 class NormalizedTranscript(MeetingArtifact):

@@ -147,3 +147,14 @@ class AudioProcessingError(MeetingError):
             recoverable=False,
             retryable=True,
         )
+
+
+class SpeechToTextError(MeetingError):
+    """Speech-to-Text provider failed (e.g., model load error, out of memory)."""
+    def __init__(self, message: str) -> None:
+        super().__init__(
+            code="SPEECH_TO_TEXT_ERROR",
+            message=message,
+            recoverable=False,
+            retryable=True,
+        )

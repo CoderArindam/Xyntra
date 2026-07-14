@@ -101,6 +101,16 @@ class MeetingSettings(BaseSettings):
     ENABLE_AUDIO_NORMALIZATION: bool = True
     FFMPEG_PATH: str = "ffmpeg"
     FFPROBE_PATH: str = "ffprobe"
+    # ------------------------------------------------------------------ #
+    # Speech-to-Text (STT)                                                 #
+    # ------------------------------------------------------------------ #
+    WHISPER_MODEL: str = "small"
+    WHISPER_DEVICE: str = "cpu"
+    WHISPER_COMPUTE_TYPE: str = "int8"
+    WHISPER_BEAM_SIZE: int = 5
+    WHISPER_LANGUAGE: str = ""
+    WHISPER_ENABLE_VAD: bool = True
+    WHISPER_BATCH_SIZE: int = 8
 
 
 meeting_config = MeetingSettings()

@@ -8,3 +8,4 @@ pyjwt[crypto]>=2.8.0
 passlib[bcrypt]>=1.7.4
 bcrypt==3.2.2
 playwright>=1.40.0
+faster-whisper>=1.0.0
