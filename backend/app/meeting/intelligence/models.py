@@ -29,6 +29,8 @@ class MeetingState(str, Enum):
     BOT_REMOVED = "bot_removed"
     HOST_ENDED = "host_ended"
     WAITING_FOR_HOST = "waiting_for_host"
+    DENIED_ENTRY = "denied_entry"
+    EMPTY_POPUP = "empty_popup"
 
 
 class EventType(str, Enum):

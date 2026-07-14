@@ -27,6 +27,8 @@ _TERMINAL_STATES = frozenset({
     MeetingState.ENDED,
     MeetingState.BOT_REMOVED,
     MeetingState.HOST_ENDED,
+    MeetingState.DENIED_ENTRY,
+    MeetingState.EMPTY_POPUP,
 })
 
 

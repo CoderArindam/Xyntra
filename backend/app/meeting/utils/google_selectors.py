@@ -20,25 +20,7 @@ from __future__ import annotations
 # Google Account authentication selectors                             #
 # ------------------------------------------------------------------ #
 
-GOOGLE_AUTH_SELECTORS: dict[str, str] = {
-    "email_input":              'input[type="email"]',
-    "password_input":           'input[type="password"]',
-    "email_next":               "#identifierNext",
-    "password_next":            "#passwordNext",
-    "account_avatar":           'a[aria-label^="Google Account"]',
-    "error_wrong_password":     '.LXRPh',
-    "error_account_not_found":  '.o6cuMc',
-    "security_challenge":       '#challengePickerList',
-    "account_chooser":          '[data-profileindex]',
-    "account_chooser_text":     "Choose an account",
-    "cookie_consent_text":      "Accept all",
-    "suspicious_login_text_1":  "Suspicious activity",
-    "suspicious_login_text_2":  "Verify it's you",
-    "captcha":                  'iframe[src*="recaptcha"], iframe[title*="recaptcha"]',
-    "all_headings":             'h1, h2, h3',
-    "all_buttons":              'button, [role="button"]',
-    "all_inputs":               'input',
-}
+
 
 GOOGLE_ACCOUNT_URL = "https://accounts.google.com"
 GOOGLE_SIGNIN_URL = "https://accounts.google.com/signin"
@@ -85,29 +67,23 @@ MEET_SELECTORS: dict[str, str] = {
     "indicator_timer":         '[jsname="vRBwBb"], [data-call-duration], [aria-label*="duration"]',
 
     # ── Waiting room ─────────────────────────────────────────────────
-    "waiting_room_text":       'text="You\'re in the waiting room"',
+    "waiting_room_text":       'text=/You\'re in the waiting room|Asking to join|You\'ll join the call when someone lets you in/i',
     "waiting_for_host":        'text="Waiting for others to join"',
 
     # ── Error states ─────────────────────────────────────────────────
     "meeting_not_found":       'text="Check your meeting code and try again"',
     "meeting_ended":           'text="The meeting has ended"',
-    "permission_denied":       'text="You can\'t join this video call"',
+    "permission_denied":       'text=/Someone in the call denied your request to join/i',
     "network_error":           'text="Can\'t join"',
     "login_required":          'text="Sign in to continue"',
+    "empty_meeting_popup":     'text="No one else"',
 
     # ── Participant panel (ParticipantDOM) ────────────────────────────
-    # Button that opens the People side panel
-    "participants_panel_btn":       '[aria-label="People"]',
-    "participants_panel_btn_v2":    'button[data-panel-id="participants"]',
+    # Each row in the participant list OR video tile
+    "participant_list_item":        '[data-participant-id]',
 
-    # Container present when panel is open
-    "participant_panel_container":  '[data-panel-id="participants"], [jsname="participants-panel"]',
-
-    # Each row in the participant list
-    "participant_list_item":        '[data-participant-id], [jsname="participant-item"]',
-
-    # Name element inside a participant row
-    "participant_name_in_item":     '[data-display-name], [jsname="displayName"], .participant-name',
+    # Name element inside a participant row/tile
+    "participant_name_in_item":     'span.notranslate',
 
     # The bot's own name tile
     "self_participant_name":        '[data-self-name], [jsname="selfName"]',

@@ -79,28 +79,12 @@ class ParticipantTracker(BaseObserver):
     def get_present_participants(self) -> list[Participant]:
         return [p for p in self._participants.values() if p.is_present]
 
-    def is_only_bot_present(self) -> bool:
-        """Return True if the bot is the only participant currently present."""
-        present = self.get_present_participants()
-        return len(present) == 1 and present[0].is_bot
-
     # ------------------------------------------------------------------ #
     # Polling loop                                                         #
     # ------------------------------------------------------------------ #
 
     async def _run(self) -> None:
         ctx = self._ctx
-        # Attempt panel open at startup; failures are non-fatal
-        try:
-            await self._dom.ensure_panel_open(ctx.page)
-        except Exception as exc:
-            if is_playwright_fatal(exc):
-                return
-            ctx.log.warning(
-                "participant_tracker.panel_open_failed",
-                session_id=ctx.session_id,
-                error=str(exc),
-            )
 
         while True:
             if self._page_is_closed():
@@ -127,13 +111,22 @@ class ParticipantTracker(BaseObserver):
                 )
 
     async def _poll(self, ctx: MeetingContext) -> None:
-        raw_list = await self._dom.get_raw_participants(ctx.page)
         now = datetime.now(timezone.utc)
+        
+        raw_list = await self._dom.get_raw_participants(ctx.page)
+                
         seen_keys: set[str] = set()
+
+        # Save previous state for logging
+        previous_participants = [p.display_name for p in self.get_present_participants()]
+        joined_names = []
+        left_names = []
+        events_emitted = []
 
         for entry in raw_list:
             raw_name: str = entry["name"]
             is_host: bool = entry.get("is_host", False)
+            is_self: bool = entry.get("is_self", False)
             norm: str = _normalize(raw_name)
             if not norm:
                 continue
@@ -148,10 +141,14 @@ class ParticipantTracker(BaseObserver):
                     p.join_time = now
                     p.leave_time = None
                     await self._emit_event(ctx, EventType.PARTICIPANT_JOINED, p)
+                    joined_names.append(p.display_name)
+                    events_emitted.append(EventType.PARTICIPANT_JOINED.value)
             else:
                 # First sighting
                 self._join_counter += 1
-                is_bot = _normalize(raw_name) == _normalize(ctx.bot_name)
+                is_bot = (
+                    is_self or _normalize(raw_name) == _normalize(ctx.bot_name)
+                )
                 p = Participant(
                     participant_id=str(uuid.uuid4()),
                     display_name=raw_name,
@@ -166,6 +163,9 @@ class ParticipantTracker(BaseObserver):
                 )
                 self._participants[norm] = p
                 await self._emit_event(ctx, EventType.PARTICIPANT_JOINED, p)
+                joined_names.append(p.display_name)
+                events_emitted.append(EventType.PARTICIPANT_JOINED.value)
+
                 ctx.log.info(
                     "participant.joined",
                     session_id=ctx.session_id,
@@ -178,6 +178,7 @@ class ParticipantTracker(BaseObserver):
 
                 if is_host:
                     await self._emit_event(ctx, EventType.HOST_JOINED, p)
+                    events_emitted.append(EventType.HOST_JOINED.value)
                     ctx.log.info(
                         "participant.host_joined",
                         session_id=ctx.session_id,
@@ -190,12 +191,16 @@ class ParticipantTracker(BaseObserver):
                 p.is_present = False
                 p.leave_time = now
                 await self._emit_event(ctx, EventType.PARTICIPANT_LEFT, p)
+                left_names.append(p.display_name)
+                events_emitted.append(EventType.PARTICIPANT_LEFT.value)
                 ctx.log.info(
                     "participant.left",
                     session_id=ctx.session_id,
                     display_name=p.display_name,
                     participant_count=len(self.get_present_participants()),
                 )
+
+        pass
 
     async def _emit_event(
         self, ctx: MeetingContext, event_type: EventType, participant: Participant

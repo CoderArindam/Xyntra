@@ -34,7 +34,7 @@ class MeetingSettings(BaseSettings):
     # ------------------------------------------------------------------ #
     # Browser profile                                                      #
     # ------------------------------------------------------------------ #
-    PROFILE_ROOT: str = str(Path("storage") / "meeting" / "profiles")
+    PROFILE_DIR: str = str(Path("storage") / "meeting" / "profile")
 
     # ------------------------------------------------------------------ #
     # Bot identity                                                         #
@@ -47,7 +47,6 @@ class MeetingSettings(BaseSettings):
     JOIN_TIMEOUT: int = 60        # seconds — max time to land in meeting
     PAGE_TIMEOUT: int = 30_000   # ms     — Playwright default timeout
     AUTH_TIMEOUT: int = 45        # seconds — max time for Google auth
-    EMPTY_TIMEOUT_SECONDS: int = 30 # seconds — wait time before leaving empty meeting
     RETRY_COUNT: int = 3
     RETRY_BASE_DELAY: float = 2.0  # seconds
     RETRY_MAX_DELAY: float = 30.0  # seconds

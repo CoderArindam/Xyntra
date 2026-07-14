@@ -30,83 +30,82 @@ class ParticipantDOM:
     Returns normalized Python dicts — no Playwright objects escape this class.
     """
 
-    async def ensure_panel_open(self, page: Any) -> bool:
-        """Open the People side panel if it isn't already visible.
-
-        Returns True when the panel is confirmed open, False on failure.
-        Note: opening the panel changes visible UI but has no meeting impact.
-        """
-        try:
-            container = page.locator(SEL["participant_panel_container"])
-            if await container.count() > 0:
-                return True
-
-            btn = page.locator(SEL["participants_panel_btn"])
-            if await btn.count() > 0:
-                await btn.first.click()
-                await page.wait_for_selector(
-                    SEL["participant_panel_container"],
-                    timeout=_PANEL_OPEN_TIMEOUT_MS,
-                )
-                return True
-        except Exception as exc:
-            log.warning("Could not open participant panel", error=str(exc))
-        return False
-
     async def get_raw_participants(self, page: Any) -> list[dict[str, Any]]:
-        """Scrape the participant list.
+        """Scrape the participant list from video tiles.
 
         Returns:
-            List of {"name": str, "is_host": bool, "avatar_url": str | None}.
-            Empty list if the panel is absent or scraping fails.
+            List of {"name": str, "is_host": bool, "avatar_url": str | None, "is_self": bool}.
+            Empty list if scraping fails or no participants are found.
         """
+        log.debug("participant_dom.scan_started")
         results: list[dict[str, Any]] = []
         try:
             items = page.locator(SEL["participant_list_item"])
             count = await items.count()
+            log.debug("participant_dom.tiles_found", count=count)
+            names_found = 0
+
             for i in range(count):
                 item = items.nth(i)
                 try:
-                    raw_name = await item.locator(SEL["participant_name_in_item"]).inner_text(
-                        timeout=_INNER_TEXT_TIMEOUT_MS
-                    )
-                    raw_name = raw_name.strip()
+                    # Get all text inside the tile to check for self indicators (including hidden tooltips)
+                    row_text = await item.text_content() or ""
+                    
+                    # Extract the exact name using the deterministic span selector
+                    name_els = item.locator(SEL["participant_name_in_item"])
+                    name_texts = await name_els.all_inner_texts()
+                    
+                    # Find the first non-empty name text
+                    raw_name = ""
+                    for nt in name_texts:
+                        if nt.strip():
+                            raw_name = nt.strip()
+                            break
+                            
                     if not raw_name:
+                        log.debug("participant_dom.name_extraction_failed", tile_index=i)
                         continue
+
+                    names_found += 1
 
                     # Detect and strip host badge
                     is_host = bool(_HOST_BADGE.search(raw_name))
                     clean_name = _HOST_BADGE.sub("", raw_name).strip()
 
-                    # Strip self-reference suffixes (bot's own tile)
+                    # Strip self-reference suffixes or detect self via text context
+                    is_self = (
+                        bool(_SELF_SUFFIXES.search(row_text)) 
+                        or "(you)" in row_text.lower()
+                        or "Others might still see your full video." in row_text
+                    )
                     clean_name = _SELF_SUFFIXES.sub("", clean_name).strip()
 
                     avatar_url: str | None = None
                     try:
-                        img = item.locator("img[src]")
+                        img = item.locator("img")
                         if await img.count() > 0:
-                            avatar_url = await img.first.get_attribute("src", timeout=_INNER_TEXT_TIMEOUT_MS)
+                            avatar_url = await img.first.get_attribute("src")
                     except Exception:
                         pass
 
-                    results.append({"name": clean_name, "is_host": is_host, "avatar_url": avatar_url})
-                except Exception:
+                    results.append({"name": clean_name, "is_host": is_host, "is_self": is_self, "avatar_url": avatar_url})
+                except Exception as exc:
+                    log.debug("participant_dom.selector_failed", tile_index=i, error=str(exc))
                     continue
 
+            log.debug("participant_dom.names_found", count=names_found)
         except Exception as exc:
             log.warning("Participant list DOM query failed", error=str(exc))
+            
+        log.debug("participant_dom.participants_returned", count=len(results))
+        log.debug("participant_dom.scan_completed")
         return results
 
     async def get_self_display_name(self, page: Any) -> str | None:
-        """Return what Google Meet shows as the bot's own name."""
-        for selector_key in ("self_participant_name", "self_name_fallback"):
-            try:
-                el = page.locator(SEL[selector_key])
-                if await el.count() > 0:
-                    name = (await el.first.inner_text(timeout=_INNER_TEXT_TIMEOUT_MS)).strip()
-                    name = _SELF_SUFFIXES.sub("", name).strip()
-                    if name:
-                        return name
-            except Exception:
-                continue
+        """Return what Google Meet shows as the bot's own name by finding the self tile."""
+        participants = await self.get_raw_participants(page)
+        for p in participants:
+            if p.get("is_self"):
+                return p["name"]
         return None
+

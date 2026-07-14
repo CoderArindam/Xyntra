@@ -46,27 +46,6 @@ class ProfileManager:
         """Return True if the profile directory looks healthy."""
         return path.exists() and path.is_dir()
 
-    def clone_profile(self, src_name: str, dst_name: str) -> Path:
-        """Clone an existing profile directory to a new location.
-        Useful for reusing authenticated sessions across multiple bots.
-        """
-        import shutil
-        src_path = self.get_profile_path(src_name)
-        dst_path = self.get_profile_path(dst_name)
-        
-        if src_path.exists() and src_path.is_dir():
-            try:
-                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
-                log.info("Profile cloned", src=src_name, dst=dst_name)
-            except Exception as exc:
-                log.warning("Profile clone failed, falling back to empty profile", src=src_name, dst=dst_name, error=str(exc))
-                self.ensure_exists(dst_path)
-        else:
-            self.ensure_exists(dst_path)
-            log.info("Profile clone skipped (src not found), created empty", src=src_name, dst=dst_name)
-            
-        return dst_path
-
     # ------------------------------------------------------------------ #
     # Locking                                                              #
     # ------------------------------------------------------------------ #
@@ -127,38 +106,5 @@ class ProfileManager:
                     )
             except (OSError, ValueError, json.JSONDecodeError):
                 # Stale or corrupt lock file
+                lock_file.unlink(missing_ok=True)
                 log.debug("Profile unlocked (stale lock removed)", path=str(path))
-
-    async def remove_when_available(self, path: Path, session_id: str) -> None:
-        """Retry-safe deletion of the profile directory. Best effort."""
-        if not path.exists():
-            return
-            
-        import shutil
-        import asyncio
-        
-        max_attempts = 10
-        delay = 0.5
-        
-        for attempt in range(1, max_attempts + 1):
-            try:
-                shutil.rmtree(path, ignore_errors=False)
-                log.info("meeting.profile.delete_success", session_id=session_id, profile_path=str(path))
-                return
-            except Exception as exc:
-                log.debug(
-                    "meeting.profile.delete_retry",
-                    session_id=session_id,
-                    profile_path=str(path),
-                    attempt=attempt,
-                    error=str(exc)
-                )
-                if attempt < max_attempts:
-                    await asyncio.sleep(delay)
-                else:
-                    log.warning(
-                        "meeting.profile.delete_failed",
-                        session_id=session_id,
-                        profile_path=str(path),
-                        error=str(exc)
-                    )

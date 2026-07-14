@@ -88,9 +88,6 @@ class MeetingRuntime:
     # Scalable task registry (join_flow, health_monitor, observers, transcription, etc.)
     background_tasks: dict[str, asyncio.Task] = field(default_factory=dict)
     
-    # Specific timer task for empty meeting detection
-    empty_timer_task: asyncio.Task | None = None
-    
     def request_shutdown(self, reason: str) -> None:
         """Signal the join flow owner to begin teardown."""
         import inspect
@@ -122,7 +119,7 @@ class MeetingService:
         self._session_manager = MeetingSessionManager()
         self._monitor = HealthMonitor(self._session_manager)
         self._debug = DebugCapture(meeting_config.DEBUG_DIR)
-        self._profile_manager = ProfileManager(meeting_config.PROFILE_ROOT)
+        self._profile_manager = ProfileManager(meeting_config.PROFILE_DIR)
 
         self._runtimes: dict[str, MeetingRuntime] = {}
 
@@ -132,7 +129,8 @@ class MeetingService:
 
     async def join_meeting(self, meeting_url: str) -> MeetingSession:
         """Create a session and fire the join flow asynchronously."""
-        session = self._session_manager.create(meeting_url)
+        profile_path = self._profile_manager.get_profile_path()
+        profile_name = profile_path.name
 
         # Emit structured dump of every registered MeetingRuntime
         detailed_registry_dump = {}
@@ -152,6 +150,13 @@ class MeetingService:
                 "page_is_closed": rt.controller.get_page().is_closed() if rt.controller and hasattr(rt.controller, "get_page") and rt.controller.get_page() else None,
             }
         log.warning("diagnostic.registry_dump", dump=detailed_registry_dump)
+
+        # Prevent concurrent join attempts on the same profile
+        for existing_rt in self._runtimes.values():
+            if existing_rt.profile_path == profile_path and existing_rt.state != RuntimeState.CLOSED:
+                raise RuntimeError("Session is already running or shutting down.")
+
+        session = self._session_manager.create(meeting_url)
 
         task = asyncio.create_task(
             self._run_join_flow(session.session_id, meeting_url),
@@ -257,22 +262,17 @@ class MeetingService:
         controller = BrowserController()
         runtime.controller = controller
         
-        profile_name = f"runtime_{session_id}"
-        profile_path = self._profile_manager.get_profile_path(profile_name)
+        profile_path = self._profile_manager.get_profile_path()
         runtime.profile_path = profile_path
+        profile_name = profile_path.name
 
-        log.info("meeting.runtime.created", session_id=session_id)
-        log.info("meeting.runtime.isolated", session_id=session_id, profile_path=str(profile_path))
-        log.info("meeting.profile.created", session_id=session_id, profile_path=str(profile_path))
-        log.info("meeting.runtime.started", session_id=session_id, runtime_state=runtime.state.value)
         log.info("runtime.starting", session_id=session_id, runtime_state=runtime.state.value, profile_name=profile_name)
 
         try:
             # ── Step 1: Browser launch ──────────────────────────── #
             self._session_manager.update_state(session_id, SessionStatus.AUTHENTICATING)
 
-            # Clone the default authenticated profile to avoid CAPTCHA / 2FA issues on fresh browsers
-            self._profile_manager.clone_profile("default", profile_name)
+            self._profile_manager.ensure_exists(profile_path)
             self._profile_manager.lock(profile_path, session_id, profile_name)
 
             await with_retry(
@@ -409,7 +409,6 @@ class MeetingService:
 
     async def _cleanup_runtime(self, runtime: MeetingRuntime) -> None:
         """Deterministic, idempotent cleanup, executed ONLY by the join flow task."""
-        log.info("meeting.runtime.cleanup_started", session_id=runtime.session_id, runtime_state=runtime.state.value)
         log.info("cleanup.started")
         if runtime.state in (RuntimeState.CLEANING_UP, RuntimeState.CLOSED):
             return
@@ -528,18 +527,7 @@ class MeetingService:
             log.warning("cleanup.profile_unlock_error", session_id=runtime.session_id, error=str(exc))
         log.info("cleanup.profile_unlock.complete", session_id=runtime.session_id, duration_ms=int((time.time() - t_stage) * 1000))
 
-        # 8. Profile Deletion (Retry-Safe)
-        t_stage = time.time()
-        log.info("cleanup.profile_deletion.start", session_id=runtime.session_id)
-        try:
-            if runtime.profile_path:
-                await self._profile_manager.remove_when_available(runtime.profile_path, runtime.session_id)
-                log.info("meeting.profile.deleted", session_id=runtime.session_id, profile_path=str(runtime.profile_path))
-        except Exception as exc:
-            log.warning("cleanup.profile_deletion_error", session_id=runtime.session_id, error=str(exc))
-        log.info("cleanup.profile_deletion.complete", session_id=runtime.session_id, duration_ms=int((time.time() - t_stage) * 1000))
-
-        # 9. Remove Registry
+        # 8. Remove Registry
         t_stage = time.time()
         log.info("cleanup.registry_remove.start", session_id=runtime.session_id)
         try:
@@ -548,7 +536,7 @@ class MeetingService:
             log.warning("cleanup.runtime_remove_error", session_id=runtime.session_id, error=str(exc))
         log.info("cleanup.registry_remove.complete", session_id=runtime.session_id, duration_ms=int((time.time() - t_stage) * 1000))
 
-        # 10. Finished
+        # 9. Finished
         try:
             runtime.state = RuntimeState.CLOSED
             if session and session.status not in TERMINAL_STATUSES:
@@ -558,8 +546,6 @@ class MeetingService:
             log.warning("cleanup.finalize_error", session_id=runtime.session_id, error=str(exc))
             
         runtime._cleanup_finished.set()
-        log.info("meeting.runtime.cleanup_finished", session_id=runtime.session_id)
-        log.info("meeting.runtime.destroyed", session_id=runtime.session_id)
         log.info("cleanup.finished", session_id=runtime.session_id, total_duration_ms=int((time.time() - start_time) * 1000))
 
     # ------------------------------------------------------------------ #
@@ -622,7 +608,11 @@ class MeetingService:
 
         et = event.type
 
-        if et in (EventType.PARTICIPANT_JOINED, EventType.PARTICIPANT_LEFT, EventType.PARTICIPANT_UPDATED):
+        if et in (
+            EventType.PARTICIPANT_JOINED, 
+            EventType.PARTICIPANT_LEFT, 
+            EventType.PARTICIPANT_UPDATED
+        ):
             participants = runtime.supervisor.participant_tracker.get_participants()
             session.participants_detailed = participants
             session.participants = [
@@ -635,20 +625,52 @@ class MeetingService:
             session.participant_events.append(event)
             session.observer_health = runtime.supervisor.get_health()
 
-            # Empty Meeting Detector
-            tracker = runtime.supervisor.participant_tracker
-            if tracker.is_only_bot_present():
-                if runtime.empty_timer_task is None or runtime.empty_timer_task.done():
-                    log.info("meeting.empty_detected", session_id=session_id)
-                    runtime.empty_timer_task = asyncio.create_task(
+            has_human_participants = any(
+                p.is_present and not p.is_bot
+                for p in participants
+            )
+            
+            existing_timer = runtime.background_tasks.get("empty_timer")
+            timer_exists = existing_timer is not None and not existing_timer.done()
+
+            if not has_human_participants:
+                if not timer_exists:
+                    log.info(
+                        "meeting.empty_detected",
+                        session_id=session_id,
+                        participant_count=present_count,
+                        has_human_participants=has_human_participants,
+                        runtime_state=runtime.state.value,
+                    )
+                    log.info(
+                        "meeting.empty_timer_started",
+                        session_id=session_id,
+                        participant_count=present_count,
+                        has_human_participants=has_human_participants,
+                        runtime_state=runtime.state.value,
+                    )
+                    timer_task = asyncio.create_task(
                         self._empty_meeting_countdown(session_id, runtime),
                         name=f"empty-timer-{session_id[:8]}"
                     )
+                    runtime.background_tasks["empty_timer"] = timer_task
             else:
-                if runtime.empty_timer_task and not runtime.empty_timer_task.done():
-                    runtime.empty_timer_task.cancel()
-                    runtime.empty_timer_task = None
-                    log.info("meeting.empty_timer_cancelled", session_id=session_id)
+                if timer_exists:
+                    existing_timer.cancel()
+                    log.info(
+                        "meeting.empty_timer_cancelled",
+                        session_id=session_id,
+                        participant_count=present_count,
+                        has_human_participants=has_human_participants,
+                        runtime_state=runtime.state.value,
+                    )
+                    log.info(
+                        "meeting.auto_leave_cancelled",
+                        session_id=session_id,
+                        participant_count=present_count,
+                        has_human_participants=has_human_participants,
+                        runtime_state=runtime.state.value,
+                    )
 
         elif et == EventType.HOST_JOINED:
             participant_name = event.payload.get("participant", {}).get("display_name", "")
@@ -689,9 +711,6 @@ class MeetingService:
                 elapsed = event.payload.get("elapsed_seconds")
                 if elapsed is not None:
                     session.meeting_duration = elapsed
-                if new_state == "host_ended_meeting":
-                    log.info("meeting.host_ended", session_id=session_id)
-
                 log.info(
                     "meeting.ended",
                     session_id=session_id,
@@ -716,13 +735,71 @@ class MeetingService:
             )
 
     async def _empty_meeting_countdown(self, session_id: str, runtime: MeetingRuntime) -> None:
-        """Countdown timer before leaving an empty meeting."""
-        log.info("meeting.empty_timer_created", session_id=session_id)
+        """Countdown when no humans are present, requesting shutdown if it expires."""
         try:
-            await asyncio.sleep(meeting_config.EMPTY_TIMEOUT_SECONDS)
-            log.info("meeting.empty_timeout", session_id=session_id)
-            log.info("meeting.auto_leave_requested", session_id=session_id)
-            log.info("meeting.empty_timer_completed", session_id=session_id)
-            runtime.request_shutdown("empty_meeting_timeout")
+            await asyncio.sleep(15)
+            log.info(
+                "meeting.empty_timer_expired",
+                session_id=session_id,
+                participant_count=0,
+                has_human_participants=False,
+                runtime_state=runtime.state.value,
+            )
+            
+            # Revalidate
+            if not runtime.supervisor:
+                return
+                
+            participants = runtime.supervisor.participant_tracker.get_participants()
+            present_count = sum(1 for p in participants if p.is_present)
+            has_human_participants = any(p.is_present and not p.is_bot for p in participants)
+            
+            log.info(
+                "meeting.empty_revalidated",
+                session_id=session_id,
+                participant_count=present_count,
+                has_human_participants=has_human_participants,
+                runtime_state=runtime.state.value,
+            )
+            
+            if not has_human_participants:
+                if runtime._cleanup_event.is_set():
+                    return
+                if runtime.state in (RuntimeState.CLEANING_UP, RuntimeState.CLOSED, RuntimeState.LEAVING):
+                    return
+                    
+                log.info(
+                    "meeting.empty_timeout",
+                    session_id=session_id,
+                    participant_count=present_count,
+                    has_human_participants=has_human_participants,
+                    runtime_state=runtime.state.value,
+                )
+                log.info(
+                    "meeting.auto_leave_requested",
+                    session_id=session_id,
+                    participant_count=present_count,
+                    has_human_participants=has_human_participants,
+                    runtime_state=runtime.state.value,
+                )
+                runtime.request_shutdown("empty_meeting_timeout")
+            else:
+                log.info(
+                    "meeting.auto_leave_cancelled",
+                    session_id=session_id,
+                    participant_count=present_count,
+                    has_human_participants=has_human_participants,
+                    runtime_state=runtime.state.value,
+                )
         except asyncio.CancelledError:
             pass
+        finally:
+            current_task = asyncio.current_task()
+            stored = runtime.background_tasks.get("empty_timer")
+            log.info(f"finally block: current={current_task}, stored={stored}")
+            if stored == current_task:
+                log.info("matched! popping.")
+                runtime.background_tasks.pop("empty_timer", None)
+            else:
+                log.info("didn't match.")
+

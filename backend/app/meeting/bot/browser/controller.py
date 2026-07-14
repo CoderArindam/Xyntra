@@ -97,6 +97,11 @@ class BrowserController:
 
         try:
             self._playwright = await async_playwright().start()
+            log.info(
+                "browser.launch_started",
+                headless=headless,
+                profile=profile_dir,
+            )
             self._context = await self._playwright.chromium.launch_persistent_context(
                 profile_dir,
                 headless=headless,
@@ -108,7 +113,7 @@ class BrowserController:
             # Apply default timeout to all future operations on this context
             self._context.set_default_timeout(page_timeout)
             log.info(
-                "Browser launched",
+                "browser.launch_completed",
                 headless=headless,
                 profile=profile_dir,
             )

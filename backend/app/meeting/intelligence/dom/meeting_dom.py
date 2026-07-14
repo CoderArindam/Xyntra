@@ -17,9 +17,11 @@ log = get_logger("intelligence.dom.meeting")
 
 # Priority-ordered detection: terminal states checked before transient states
 _STATE_SELECTOR_MAP: list[tuple[str, MeetingState]] = [
+    ("empty_meeting_popup", MeetingState.EMPTY_POPUP),
     ("bot_removed_dialog",  MeetingState.BOT_REMOVED),
     ("host_ended_meeting",  MeetingState.HOST_ENDED),
     ("meeting_ended",       MeetingState.ENDED),
+    ("permission_denied",   MeetingState.DENIED_ENTRY),
     ("reconnecting_dialog", MeetingState.RECONNECTING),
     ("network_lost_banner", MeetingState.NETWORK_LOST),
     ("waiting_for_host",    MeetingState.WAITING_FOR_HOST),

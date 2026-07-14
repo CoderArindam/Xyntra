@@ -126,7 +126,6 @@ class HealthMonitor:
 
                 if not browser_alive or not page_alive:
                     reason = "browser_disconnected" if not browser_alive else "page_closed"
-                    log.info(f"meeting.{reason}", session_id=session_id)
                     log.info("health_monitor.request_cleanup", reason=reason)
                     log.warning(
                         f"{reason} — requesting shutdown",
