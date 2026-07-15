@@ -40,7 +40,7 @@ async def get_latest_recording_file(recordings_dir: Path) -> Path | None:
         if not session_dir.is_dir():
             continue
         for file_path in session_dir.iterdir():
-            if file_path.is_file() and not file_path.name.endswith(".tmp"):
+            if file_path.is_file() and file_path.suffix.lower() in (".webm", ".mkv", ".mp4", ".wav"):
                 mtime = file_path.stat().st_mtime
                 if mtime > latest_time:
                     latest_time = mtime

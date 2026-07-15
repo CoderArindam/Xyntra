@@ -111,6 +111,57 @@ class MeetingSettings(BaseSettings):
     WHISPER_LANGUAGE: str = ""
     WHISPER_ENABLE_VAD: bool = True
     WHISPER_BATCH_SIZE: int = 8
+    # ------------------------------------------------------------------ #
+    # Experimental: Groq Speech-to-Text                                    #
+    # ------------------------------------------------------------------ #
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "whisper-large-v3"
+    GROQ_TIMEOUT: int = 300
+    GROQ_MAX_RETRIES: int = 3
+
+    # ------------------------------------------------------------------ #
+    # Transcript Normalization                                             #
+    # ------------------------------------------------------------------ #
+    NORMALIZATION_ENABLE_FILLER_REMOVAL: bool = True
+    # Segment merging is intentionally disabled.
+    # Transcript boundaries are produced by the STT provider and must remain
+    # immutable through the normalization stage. If future UI formatting
+    # requires merged paragraphs, that must happen in a separate rendering
+    # layer after speaker attribution is complete.
+    NORMALIZATION_ENABLE_SEGMENT_MERGE: bool = False
+    NORMALIZATION_ENABLE_DUPLICATE_REMOVAL: bool = True
+    NORMALIZATION_ENABLE_CAPITALIZATION: bool = True
+    NORMALIZATION_ENABLE_PUNCTUATION: bool = True
+    # Repeated-char rule is disabled by default — language-specific dicts
+    # required for safe correction (e.g. "committee" must not collapse).
+    NORMALIZATION_ENABLE_REPEATED_CHARS: bool = False
+    # Max silence gap (ms) between adjacent segments eligible for merging
+    NORMALIZATION_MAX_SEGMENT_GAP_MS: int = 1500
+    # Max combined character length for a merged segment
+    NORMALIZATION_MAX_SEGMENT_LENGTH: int = 500
+    NORMALIZATION_PROCESSING_VERSION: str = "1.0.0"
+
+    # ------------------------------------------------------------------ #
+    # Speaker Diarization (Pyannote)                                       #
+    # ------------------------------------------------------------------ #
+    DIARIZATION_PYANNOTE_AUTH_TOKEN: str = ""
+    DIARIZATION_PYANNOTE_MODEL: str = "pyannote/speaker-diarization-3.1"
+    DIARIZATION_MIN_SPEAKERS: int = 1
+    DIARIZATION_MAX_SPEAKERS: int = 10
+    DIARIZATION_PROCESSING_VERSION: str = "1.0.0"
+
+    # ------------------------------------------------------------------ #
+    # Speaker Attribution                                                  #
+    # ------------------------------------------------------------------ #
+    # Minimum segment-to-turn overlap ratio required to assign a speaker label.
+    # A value of 0.5 means the turn must cover ≥50% of the segment's duration.
+    ATTRIBUTION_OVERLAP_THRESHOLD: float = 0.5
+    ATTRIBUTION_PROCESSING_VERSION: str = "1.0.0"
+
+    # ------------------------------------------------------------------ #
+    # Speaker Mapping                                                      #
+    # ------------------------------------------------------------------ #
+    MAPPING_PROCESSING_VERSION: str = "1.0.0"
 
 
 meeting_config = MeetingSettings()

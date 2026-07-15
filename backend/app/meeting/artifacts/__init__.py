@@ -1,10 +1,25 @@
 # Expose artifacts
 from .base import MeetingArtifact
 from .recording import MeetingRecording, AudioSegment, ProcessedAudio
+from .speaker import (
+    DiarizationProviderInfo,
+    SpeakerTurn,
+    MeetingParticipant,
+    SpeakerMappingEntry,
+    SpeakerAttributedSegment,
+    ParticipantAttributedSegment,
+    SpeakerTimeline,
+    ParticipantRoster,
+    SpeakerMapping,
+    SpeakerAttributedTranscript,
+    ParticipantAttributedTranscript,
+)
 from .transcript import (
     TranscriptSegment,
     SpeakerSegment,
     RawTranscript,
+    NormalizedTranscriptSegment,
+    NormalizationStatistics,
     NormalizedTranscript,
     MeetingTranscript,
 )
@@ -19,6 +34,8 @@ __all__ = [
     "TranscriptSegment",
     "SpeakerSegment",
     "RawTranscript",
+    "NormalizedTranscriptSegment",
+    "NormalizationStatistics",
     "NormalizedTranscript",
     "MeetingTranscript",
     "MeetingInsights",
@@ -26,4 +43,16 @@ __all__ = [
     "ActionItem",
     "ExtractedTask",
     "TaskProposal",
+    # Speaker diarization & attribution
+    "DiarizationProviderInfo",
+    "SpeakerTurn",
+    "MeetingParticipant",
+    "SpeakerMappingEntry",
+    "SpeakerAttributedSegment",
+    "ParticipantAttributedSegment",
+    "SpeakerTimeline",
+    "ParticipantRoster",
+    "SpeakerMapping",
+    "SpeakerAttributedTranscript",
+    "ParticipantAttributedTranscript",
 ]

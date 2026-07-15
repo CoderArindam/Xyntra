@@ -158,3 +158,47 @@ class SpeechToTextError(MeetingError):
             recoverable=False,
             retryable=True,
         )
+
+
+class TranscriptNormalizationError(MeetingError):
+    """Transcript normalization pipeline failed."""
+    def __init__(self, message: str, *, retryable: bool = False) -> None:
+        super().__init__(
+            code="TRANSCRIPT_NORMALIZATION_ERROR",
+            message=message,
+            recoverable=False,
+            retryable=retryable,
+        )
+
+
+class DiarizationError(MeetingError):
+    """Speaker diarization provider failed."""
+    def __init__(self, message: str, *, retryable: bool = True) -> None:
+        super().__init__(
+            code="DIARIZATION_ERROR",
+            message=message,
+            recoverable=False,
+            retryable=retryable,
+        )
+
+
+class SpeakerAttributionError(MeetingError):
+    """Speaker-to-segment alignment or participant resolution failed."""
+    def __init__(self, message: str, *, retryable: bool = False) -> None:
+        super().__init__(
+            code="SPEAKER_ATTRIBUTION_ERROR",
+            message=message,
+            recoverable=False,
+            retryable=retryable,
+        )
+
+
+class SpeakerMappingError(MeetingError):
+    """Speaker-to-participant mapping failed."""
+    def __init__(self, message: str, *, retryable: bool = False) -> None:
+        super().__init__(
+            code="SPEAKER_MAPPING_ERROR",
+            message=message,
+            recoverable=False,
+            retryable=retryable,
+        )
