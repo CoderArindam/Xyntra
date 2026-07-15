@@ -159,8 +159,21 @@ class MeetingSettings(BaseSettings):
     ATTRIBUTION_PROCESSING_VERSION: str = "1.0.0"
 
     # ------------------------------------------------------------------ #
-    # Speaker Mapping                                                      #
+    # Speaker Alignment (M2.6.1)                                         #
     # ------------------------------------------------------------------ #
+    # Minimum segment-to-turn overlap ratio required to assign a speaker label.
+    ALIGNMENT_OVERLAP_THRESHOLD: float = 0.5
+    ALIGNMENT_SCORE_SEGMENT_WEIGHT: float = 0.70
+    ALIGNMENT_SCORE_SPEAKER_WEIGHT: float = 0.30
+    ALIGNMENT_MIN_TURN_DURATION_MS: int = 200
+    ALIGNMENT_MERGE_GAP_MS: int = 250
+    ALIGNMENT_PROCESSING_VERSION: str = "1.1.0"
+
+    # ------------------------------------------------------------------ #
+    # Speaker Mapping (M2.7)                                             #
+    # ------------------------------------------------------------------ #
+    PARTICIPANT_PROVIDER: str = "json"  # "json" | "google"
+    MAPPING_STRATEGY: str = "dummy"
     MAPPING_PROCESSING_VERSION: str = "1.0.0"
 
 

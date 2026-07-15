@@ -187,6 +187,17 @@ class SpeakerMapping(MeetingArtifact):
     parent_participant_roster_id: Optional[str] = None
     mapping_strategy: str = "unknown"   # current resolution strategy
     entries: List[SpeakerMappingEntry]
+    
+    # Resolution Statistics
+    resolved_count: int = 0
+    unresolved_count: int = 0
+    participant_count: int = 0
+    speaker_count: int = 0
+    
+    # Processing Metadata
+    mapping_started_at: str             # ISO 8601
+    mapping_completed_at: str           # ISO 8601
+    mapping_duration_ms: int
     processing_version: str
 
 

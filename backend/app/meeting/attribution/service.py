@@ -36,132 +36,11 @@ from app.meeting.logger import get_logger
 
 log = get_logger("attribution.service")
 
-
-def _best_matching_turn(
-    seg_start: float,
-    seg_end: float,
-    turns: list[SpeakerTurn],
-    threshold: float,
-) -> tuple[Optional[SpeakerTurn], Optional[float]]:
-    """Return the SpeakerTurn with the highest overlap ratio for a segment.
-
-    overlap_ratio = overlap_duration / segment_duration
-    Returns (None, None) when no turn exceeds the threshold.
-    """
-    seg_duration = seg_end - seg_start
-    if seg_duration <= 0:
-        return None, None
-
-    best_turn: Optional[SpeakerTurn] = None
-    best_ratio = 0.0
-
-    for turn in turns:
-        overlap_start = max(seg_start, turn.start_time)
-        overlap_end = min(seg_end, turn.end_time)
-        overlap = max(0.0, overlap_end - overlap_start)
-        ratio = overlap / seg_duration
-        if ratio > best_ratio:
-            best_ratio = ratio
-            best_turn = turn
-
-    if best_ratio >= threshold:
-        return best_turn, round(best_ratio, 4)
-    return None, None
-
-
 class SpeakerAttributionService:
-    """Performs speaker-to-segment alignment and participant identity resolution."""
-
-    # ------------------------------------------------------------------ #
-    # Stage 1 — align                                                      #
-    # ------------------------------------------------------------------ #
-
-    async def align(
-        self,
-        transcript: NormalizedTranscript,
-        timeline: Optional[SpeakerTimeline],
-    ) -> SpeakerAttributedTranscript:
-        """Annotate transcript segments with anonymous speaker labels.
-
-        Falls back gracefully when timeline is None — all segments are
-        returned with speaker_label=None.
-        """
-        log.info(
-            "attribution.started",
-            meeting_id=transcript.meeting_id,
-            transcript_id=transcript.id,
-            timeline_id=timeline.id if timeline else None,
-            segment_count=len(transcript.segments),
-        )
-
-        start_dt = datetime.now(timezone.utc)
-        t0 = time.monotonic()
-
-        try:
-            turns = timeline.turns if timeline else []
-            threshold = meeting_config.ATTRIBUTION_OVERLAP_THRESHOLD
-            attributed_segments: list[SpeakerAttributedSegment] = []
-            unattributed = 0
-
-            for seg in transcript.segments:
-                best_turn, ratio = _best_matching_turn(
-                    seg.start_time, seg.end_time, turns, threshold
-                )
-                if best_turn is None:
-                    unattributed += 1
-
-                attributed_segments.append(
-                    SpeakerAttributedSegment(
-                        segment_id=seg.id,
-                        start_time=seg.start_time,
-                        end_time=seg.end_time,
-                        text=seg.text,
-                        speaker_label=best_turn.speaker_label if best_turn else None,
-                        diarization_confidence=best_turn.diarization_confidence if best_turn else None,
-                        attribution_confidence=ratio,
-                        language=seg.language,
-                    )
-                )
-
-        except Exception as exc:
-            log.error(
-                "attribution.failed",
-                meeting_id=transcript.meeting_id,
-                error=str(exc),
-            )
-            raise SpeakerAttributionError(f"Speaker alignment failed: {exc}") from exc
-
-        end_dt = datetime.now(timezone.utc)
-        duration_ms = int((time.monotonic() - t0) * 1000)
-
-        artifact = SpeakerAttributedTranscript(
-            meeting_id=transcript.meeting_id,
-            parent_normalized_transcript_id=transcript.id,
-            parent_speaker_timeline_id=timeline.id if timeline else None,
-            segments=attributed_segments,
-            unattributed_segment_count=unattributed,
-            attribution_started_at=start_dt.isoformat(),
-            attribution_completed_at=end_dt.isoformat(),
-            attribution_duration_ms=duration_ms,
-            processing_version=meeting_config.ATTRIBUTION_PROCESSING_VERSION,
-        )
-
-        log.info(
-            "attribution.completed",
-            meeting_id=transcript.meeting_id,
-            artifact_id=artifact.id,
-            segment_count=len(attributed_segments),
-            unattributed=unattributed,
-            duration_ms=duration_ms,
-        )
-        log.info(
-            "meeting.artifact.generated",
-            artifact_type="SpeakerAttributedTranscript",
-            artifact_id=artifact.id,
-            meeting_id=transcript.meeting_id,
-        )
-
-        return artifact
+    """Performs participant identity resolution.
+    
+    Stage 1 align() was moved to alignment.service.
+    """
 
     # ------------------------------------------------------------------ #
     # Stage 2 — resolve                                                    #
@@ -229,6 +108,18 @@ class SpeakerAttributionService:
                 error=str(exc),
             )
             raise SpeakerAttributionError(f"Speaker resolution failed: {exc}") from exc
+
+        if len(resolved_segments) != len(attributed.segments):
+            log.error(
+                "attribution.resolution.segment_mismatch",
+                meeting_id=attributed.meeting_id,
+                input_segments=len(attributed.segments),
+                output_segments=len(resolved_segments),
+            )
+            raise SpeakerAttributionError(
+                f"Segment count mismatch during resolution! "
+                f"Input: {len(attributed.segments)}, Output: {len(resolved_segments)}"
+            )
 
         end_dt = datetime.now(timezone.utc)
         duration_ms = int((time.monotonic() - t0) * 1000)

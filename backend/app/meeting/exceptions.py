@@ -202,3 +202,25 @@ class SpeakerMappingError(MeetingError):
             recoverable=False,
             retryable=retryable,
         )
+
+
+class SpeakerAlignmentError(MeetingError):
+    """Speaker-to-segment alignment failed (invalid inputs or algorithm error)."""
+    def __init__(self, message: str, *, retryable: bool = False) -> None:
+        super().__init__(
+            code="SPEAKER_ALIGNMENT_ERROR",
+            message=message,
+            recoverable=False,
+            retryable=retryable,
+        )
+
+
+class ParticipantProviderUnavailable(MeetingError):
+    """Requested participant roster provider is unavailable or unimplemented."""
+    def __init__(self, message: str) -> None:
+        super().__init__(
+            code="PARTICIPANT_PROVIDER_UNAVAILABLE",
+            message=message,
+            recoverable=False,
+            retryable=False,
+        )
