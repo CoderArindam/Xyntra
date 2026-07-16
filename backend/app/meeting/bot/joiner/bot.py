@@ -64,13 +64,34 @@ class GoogleMeetJoiner:
             if bot_name:
                 await self._set_display_name(page, bot_name)
 
-            return await self._click_join_and_detect(page)
+            state = await self._click_join_and_detect(page)
+            if state == JoinState.IN_MEETING:
+                await self._open_participant_sidebar(page)
+            return state
 
         except (MeetingJoinError, NetworkError, PermissionDeniedError):
             raise
         except Exception as exc:
             log.error("meeting.join.failed", error=str(exc), url=meeting_url)
             return JoinState.UNKNOWN_ERROR
+
+    async def _open_participant_sidebar(self, page: Any) -> None:
+        """Click the 'Show everyone' button to open the participant list sidebar."""
+        try:
+            sidebar_selector = '[aria-label="Participants"]'
+            if await page.locator(sidebar_selector).count() > 0:
+                log.info("Participant sidebar is already open")
+                return
+
+            people_btn = page.locator(SEL["indicator_people"])
+            if await people_btn.count() > 0:
+                await people_btn.first.click()
+                log.info("Clicked People button to open participant sidebar")
+                await asyncio.sleep(1.0)
+            else:
+                log.warning("Could not find People button to open sidebar")
+        except Exception as exc:
+            log.warning("Failed to open participant sidebar", error=str(exc))
 
     async def leave(self, page: Any) -> None:
         """Leave the current meeting — click Leave button or close the page."""
@@ -219,9 +240,6 @@ class GoogleMeetJoiner:
     # Ordered list of (selector_key, human-readable label)
     _JOIN_INDICATORS = [
         ("indicator_leave",        "Leave button"),
-        ("indicator_mic",          "Mic button"),
-        ("indicator_camera",       "Camera button"),
-        ("indicator_more_options", "More options button"),
         ("indicator_people",       "People button"),
         ("indicator_chat",         "Chat button"),
         ("indicator_activities",   "Activities button"),
@@ -373,3 +391,6 @@ class GoogleMeetJoiner:
             confidence=confidence,
             total=len(self._JOIN_INDICATORS),
         )
+
+
+

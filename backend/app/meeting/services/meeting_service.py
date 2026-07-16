@@ -235,10 +235,40 @@ class MeetingService:
     # ------------------------------------------------------------------ #
 
     def get_participants(self, session_id: str) -> list[Participant]:
-        runtime = self._runtimes.get(session_id)
-        if not runtime or not runtime.supervisor:
+        from app.meeting.providers.participant_presence.registry import presence_registry
+        from app.meeting.intelligence.models import Participant
+        from datetime import datetime, timezone
+        
+        provider = presence_registry.get_provider(session_id)
+        if not provider:
             return []
-        return runtime.supervisor.participant_tracker.get_participants()
+            
+        participants = []
+        for p in provider.get_current_snapshot():
+            try:
+                jt = datetime.fromisoformat(p.join_time.replace("Z", "+00:00"))
+            except Exception:
+                jt = datetime.now(timezone.utc)
+            
+            lt = None
+            if p.leave_time:
+                try:
+                    lt = datetime.fromisoformat(p.leave_time.replace("Z", "+00:00"))
+                except Exception:
+                    pass
+                    
+            participants.append(Participant(
+                participant_id=p.participant_id,
+                display_name=p.display_name,
+                normalized_name=p.display_name.lower().strip(),
+                join_order=p.join_order,
+                is_bot=p.is_bot,
+                is_present=not bool(p.leave_time),
+                join_time=jt,
+                leave_time=lt
+            ))
+            
+        return participants
 
     def get_timeline(self, session_id: str) -> list[MeetingEvent]:
         runtime = self._runtimes.get(session_id)
@@ -577,6 +607,11 @@ class MeetingService:
         log.info("cleanup.registry_remove.start", session_id=runtime.session_id)
         try:
             self._runtimes.pop(runtime.session_id, None)
+            
+            # Release presence provider
+            from app.meeting.providers.participant_presence.registry import presence_registry
+            presence_registry.release_provider(runtime.session_id)
+            
         except Exception as exc:
             log.warning("cleanup.runtime_remove_error", session_id=runtime.session_id, error=str(exc))
         log.info("cleanup.registry_remove.complete", session_id=runtime.session_id, duration_ms=int((time.time() - t_stage) * 1000))
@@ -592,6 +627,16 @@ class MeetingService:
             
         runtime._cleanup_finished.set()
         log.info("cleanup.finished", session_id=runtime.session_id, total_duration_ms=int((time.time() - start_time) * 1000))
+
+        # 10. Start Pipeline
+        if session and session.recording_artifact_id:
+            try:
+                from app.meeting.pipeline.orchestrator import MeetingPipelineOrchestrator
+                log.info("pipeline.starting", session_id=runtime.session_id)
+                orchestrator = MeetingPipelineOrchestrator(meeting_id=runtime.session_id)
+                asyncio.create_task(orchestrator.execute_pipeline(), name=f"pipeline-{runtime.session_id[:8]}")
+            except Exception as exc:
+                log.error("pipeline.start_failed", session_id=runtime.session_id, error=str(exc))
 
     # ------------------------------------------------------------------ #
     # Recording orchestration                                              #
@@ -668,6 +713,17 @@ class MeetingService:
             session.observer_health = supervisor.get_health()
 
         log.info("observers.started", session_id=session_id)
+        # Trigger an initial presence evaluation so the empty-meeting timer can start
+        # if the meeting was already empty before intelligence started.
+        if runtime.event_bus:
+            from app.meeting.intelligence.models import MeetingEvent, EventType, EventCategory
+            import asyncio
+            asyncio.create_task(runtime.event_bus.emit(MeetingEvent(
+                type=EventType.PARTICIPANT_UPDATED,
+                category=EventCategory.PARTICIPANT,
+                source="system_initialization",
+                payload={"reason": "initial_presence_sync"}
+            )))
 
     def _make_event_handler(self, session_id: str):
         """Return a bound async handler for a given session."""
@@ -694,7 +750,7 @@ class MeetingService:
             EventType.PARTICIPANT_LEFT, 
             EventType.PARTICIPANT_UPDATED
         ):
-            participants = runtime.supervisor.participant_tracker.get_participants()
+            participants = self.get_participants(session_id)
             session.participants_detailed = participants
             session.participants = [
                 p.display_name for p in participants if p.is_present
@@ -831,7 +887,7 @@ class MeetingService:
             if not runtime.supervisor:
                 return
                 
-            participants = runtime.supervisor.participant_tracker.get_participants()
+            participants = self.get_participants(session_id)
             present_count = sum(1 for p in participants if p.is_present)
             has_human_participants = any(p.is_present and not p.is_bot for p in participants)
             

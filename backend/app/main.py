@@ -1,4 +1,9 @@
 from fastapi import FastAPI
+import warnings
+
+# Silence pyannote's libtorchcodec warning traceback clutter
+warnings.filterwarnings("ignore", category=UserWarning, module="pyannote.audio.core.io")
+warnings.filterwarnings("ignore", message=".*torchcodec.*")
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager

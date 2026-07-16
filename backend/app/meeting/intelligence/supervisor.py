@@ -18,7 +18,6 @@ from app.meeting.intelligence.models import (
     EventType,
     MeetingEvent,
 )
-from app.meeting.intelligence.participant_tracker import ParticipantTracker
 from app.meeting.intelligence.speaker_detector import SpeakerDetector
 from app.meeting.logger import get_logger
 
@@ -36,7 +35,6 @@ class ObserverSupervisor:
     def __init__(self) -> None:
         self._ctx: MeetingContext | None = None
         self._observers: dict[str, BaseObserver] = {
-            "participant_tracker": ParticipantTracker(),
             "speaker_detector": SpeakerDetector(),
             "meeting_state_observer": MeetingStateObserver(),
         }
@@ -44,10 +42,6 @@ class ObserverSupervisor:
     # ------------------------------------------------------------------ #
     # Typed accessors                                                      #
     # ------------------------------------------------------------------ #
-
-    @property
-    def participant_tracker(self) -> ParticipantTracker:
-        return self._observers["participant_tracker"]  # type: ignore[return-value]
 
     @property
     def speaker_detector(self) -> SpeakerDetector:

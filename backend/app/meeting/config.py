@@ -172,9 +172,15 @@ class MeetingSettings(BaseSettings):
     # ------------------------------------------------------------------ #
     # Speaker Mapping (M2.7)                                             #
     # ------------------------------------------------------------------ #
-    PARTICIPANT_PROVIDER: str = "json"  # "json" | "google"
-    MAPPING_STRATEGY: str = "dummy"
+    PARTICIPANT_PROVIDER: str = "external"  # "json" | "google" | "external"
+    MAPPING_STRATEGY: str = "join_order"
     MAPPING_PROCESSING_VERSION: str = "1.0.0"
 
+    # ------------------------------------------------------------------ #
+    # Chrome Extension (M2.7.8)                                          #
+    # ------------------------------------------------------------------ #
+    EXTENSION_API_KEY_HASH: str = ""
+    EXTENSION_ENABLED: bool = True
+    EXTENSION_DIRECTORY: str = "../extension"
 
 meeting_config = MeetingSettings()

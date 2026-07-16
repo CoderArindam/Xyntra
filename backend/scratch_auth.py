@@ -1,8 +1,11 @@
-"""GoogleAuthService — persistent Google authentication via Playwright.
+﻿"""GoogleAuthService ΓÇö persistent Google authentication via Playwright.
 
 Detects whether the browser profile already has a valid Google session.
-If yes, skips login entirely. If not, runs the standard email->password
+If yes, skips login entirely. If not, runs the standard emailΓåÆpassword
 flow and waits for session persistence.
+
+All DOM selectors are imported from utils/google_selectors.py ΓÇö change
+Google's UI in one place only.
 """
 
 from __future__ import annotations
@@ -19,13 +22,14 @@ from app.meeting.logger import get_logger
 from app.meeting.utils.google_selectors import (
     GOOGLE_ACCOUNT_URL,
     GOOGLE_MY_ACCOUNT_URL,
+    GOOGLE_AUTH_SELECTORS as SEL,
 )
 
 log = get_logger("browser.auth")
 
-_AUTH_CHECK_TIMEOUT = 15_000   # ms — how long to wait for redirect on auth check
-_LOGIN_STEP_TIMEOUT = 20_000   # ms — timeout per login step
-_POST_LOGIN_TIMEOUT = 30_000   # ms — wait for final redirect after password
+_AUTH_CHECK_TIMEOUT = 15_000   # ms ΓÇö how long to wait for redirect on auth check
+_LOGIN_STEP_TIMEOUT = 20_000   # ms ΓÇö timeout per login step
+_POST_LOGIN_TIMEOUT = 30_000   # ms ΓÇö wait for final redirect after password
 
 
 class AuthState(Enum):
@@ -60,18 +64,14 @@ class GoogleAuthService:
     async def ensure_authenticated(self, page: Any) -> None:
         """Guarantee the page is authenticated with Google."""
         log.info("meeting.auth.start")
-        log.info("browser.profile_loaded")
 
         if await self._is_authenticated(page):
-            log.info("meeting.auth.cached — reusing persisted session")
-            log.info("browser.profile_reused")
+            log.info("meeting.auth.cached ΓÇö reusing persisted session")
             return
 
-        log.info("meeting.auth.login — no cached session or session expired, starting login flow")
-        log.info("browser.authentication_required")
+        log.info("meeting.auth.login ΓÇö no cached session, starting login flow")
         await self._perform_login(page)
         log.info("meeting.auth.success")
-        log.info("browser.authentication_completed")
 
     async def _is_authenticated(self, page: Any) -> bool:
         """Navigate to Google Accounts and check if we're already signed in."""
@@ -79,44 +79,16 @@ class GoogleAuthService:
             await page.goto(GOOGLE_ACCOUNT_URL, wait_until="domcontentloaded", timeout=_AUTH_CHECK_TIMEOUT)
             await page.wait_for_load_state("networkidle", timeout=_AUTH_CHECK_TIMEOUT)
         except Exception:
-            pass
+            return False
 
         current_url = page.url
-        if GOOGLE_MY_ACCOUNT_URL in current_url or "meet.google.com" in current_url:
-            return await self._verify_account_email(page)
-        return False
-
-    async def _verify_account_email(self, page: Any) -> bool:
-        """Verify the logged-in account matches the configured email."""
-        try:
-            body_text = await page.locator("body").inner_text()
-            if self._email.lower() in body_text.lower():
-                return True
-            
-            account_btn = page.locator('a[aria-label^="Google Account"]')
-            if await account_btn.count() > 0:
-                label = await account_btn.first.get_attribute("aria-label")
-                if label and self._email.lower() in label.lower():
-                    return True
-                    
-            log.warning("meeting.auth.email_mismatch", expected=self._email)
-            return False
-        except Exception as exc:
-            log.warning("meeting.auth.email_verification_failed", error=str(exc))
-            return False
+        return GOOGLE_MY_ACCOUNT_URL in current_url or "meet.google.com" in current_url
 
     async def _perform_login(self, page: Any) -> None:
         try:
-            for attempt in range(3):
-                try:
-                    await self._navigate_to_signin(page)
-                    break
-                except Exception as exc:
-                    log.warning(f"Failed to navigate to signin (attempt {attempt + 1}): {exc}")
-                    if attempt == 2:
-                        raise AuthenticationError("Failed to reach Google sign-in page.", retryable=True) from exc
-                    await asyncio.sleep(2)
+            await self._navigate_to_signin(page)
             
+            # Using max_steps to prevent an infinite loop while still using while True pattern
             max_steps = 15
             step = 0
             previous_state = None
@@ -124,8 +96,9 @@ class GoogleAuthService:
             while step < max_steps:
                 state = await self.detect_login_state(page)
                 
+                # Log state transitions
                 if previous_state and previous_state != state and state != AuthState.UNKNOWN:
-                    log.info(f"{previous_state.name} → {state.name}")
+                    log.info(f"{previous_state.name} \u2192 {state.name}")
                 if state != AuthState.UNKNOWN:
                     previous_state = state
                 
@@ -154,8 +127,6 @@ class GoogleAuthService:
                         raise AuthenticationError("Two-factor authentication required. Please disable 2FA for this bot account.", retryable=False)
                         
                     case AuthState.AUTHENTICATED:
-                        if not await self._verify_account_email(page):
-                            raise AuthenticationError(f"Logged into wrong account. Expected {self._email}", retryable=False)
                         log.info("Successfully authenticated via state machine.")
                         return
                         
@@ -164,6 +135,7 @@ class GoogleAuthService:
                         
                     case AuthState.UNKNOWN:
                         await self._capture_debug(page, state)
+                        # Wait a bit before retry_detection in the next loop tick
                         await asyncio.sleep(2)
                         
                 step += 1
@@ -191,6 +163,7 @@ class GoogleAuthService:
     async def detect_login_state(self, page: Any) -> AuthState:
         """Evaluate multiple independent signals to classify the current page."""
         try:
+            # Quick check to avoid checking locators while network is heavily loading SPA
             await page.wait_for_load_state("networkidle", timeout=1000)
         except Exception:
             pass
@@ -327,6 +300,7 @@ class GoogleAuthService:
         )
         log.error(log_message)
         
+        # Capture HTML and screenshot
         html = await page.content()
         log.error(f"HTML Dump (truncated): {html[:3000]}...")
         
@@ -342,6 +316,7 @@ class GoogleAuthService:
         )
 
     async def _handle_email(self, page: Any) -> None:
+        # Evaluate which email input to use
         email_input = page.get_by_label("Email or phone").first
         if not await email_input.is_visible():
             email_input = page.locator('input[type="email"]').first
@@ -350,6 +325,7 @@ class GoogleAuthService:
             
         await email_input.fill(self._email)
         
+        # Click the next button, which can vary
         next_btn = page.get_by_role("button", name="Next").first
         if not await next_btn.is_visible():
             next_btn = page.get_by_text("Next", exact=True).first

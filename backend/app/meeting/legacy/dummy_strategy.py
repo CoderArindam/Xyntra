@@ -9,7 +9,7 @@ from app.meeting.artifacts.speaker import (
     SpeakerTimeline,
 )
 from app.meeting.config import meeting_config
-from .strategy import SpeakerMappingStrategy
+from app.meeting.mapping.strategy import SpeakerMappingStrategy
 
 
 class DummyMappingStrategy(SpeakerMappingStrategy):
@@ -58,8 +58,8 @@ class DummyMappingStrategy(SpeakerMappingStrategy):
                 entries.append(
                     SpeakerMappingEntry(
                         speaker_label=label,
-                        participant_id=None,
-                        participant_name=None,
+                        participant_id="UNKNOWN_PARTICIPANT",
+                        participant_name=f"UNRESOLVED_{label}",
                         mapping_confidence=0.0,
                         mapping_source=self.strategy_name,
                     )

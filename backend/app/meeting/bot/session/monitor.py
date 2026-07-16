@@ -32,7 +32,6 @@ if TYPE_CHECKING:
 log = get_logger("session.monitor")
 
 _OBSERVER_NAMES = (
-    "participant_tracker",
     "speaker_detector",
     "meeting_state_observer",
 )

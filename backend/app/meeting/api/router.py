@@ -30,11 +30,13 @@ from app.meeting.services.meeting_service import MeetingService
 
 log = get_logger("api")
 
-router = APIRouter(prefix="/meeting", tags=["meeting"])
+from app.meeting.presence.router import router as presence_router
 
-# Module-level singleton — stateless at import; no side effects until a
-# request is received.
-_service = MeetingService()
+router = APIRouter(prefix="/meeting", tags=["meeting"])
+router.include_router(presence_router, prefix="")
+
+# Import the shared module-level singleton
+from app.meeting.services.registry import meeting_service
 
 _STATE_MESSAGES: dict[str, str] = {
     "starting":       "Bot is initialising.",
@@ -62,7 +64,7 @@ async def join_meeting(request: JoinRequest):
     real-time status updates.
     """
     try:
-        session = await _service.join_meeting(request.meeting_url)
+        session = await meeting_service.join_meeting(request.meeting_url)
         return JoinResponse(
             session_id=session.session_id,
             status=session.status.value,
@@ -82,7 +84,7 @@ async def leave_meeting(session_id: str):
 
     Clicks the Leave button if possible, otherwise closes the browser.
     """
-    session = await _service.leave_meeting(session_id)
+    session = await meeting_service.leave_meeting(session_id)
     if not session:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
 
@@ -100,7 +102,7 @@ async def get_session(session_id: str):
     Returns all session fields including join_state, browser_alive,
     page_alive, last_heartbeat, current_url, and all M1.5 intelligence fields.
     """
-    session = _service.get_session(session_id)
+    session = meeting_service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
     return SessionResponse(**session.to_dict())
@@ -117,11 +119,11 @@ async def get_participants(session_id: str):
     Includes all participants seen this session — both present and departed.
     `is_present` indicates current status.
     """
-    session = _service.get_session(session_id)
+    session = meeting_service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
 
-    participants = _service.get_participants(session_id)
+    participants = meeting_service.get_participants(session_id)
     present_count = sum(1 for p in participants if p.is_present)
 
     return ParticipantListResponse(
@@ -146,11 +148,11 @@ async def get_timeline(session_id: str):
 
     Future transcription alignment will use speaker slot timestamps from this timeline.
     """
-    session = _service.get_session(session_id)
+    session = meeting_service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
 
-    events = _service.get_timeline(session_id)
+    events = meeting_service.get_timeline(session_id)
 
     return TimelineResponse(
         session_id=session_id,

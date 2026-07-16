@@ -22,21 +22,6 @@ from app.meeting.logger import get_logger
 
 log = get_logger("browser.controller")
 
-# Browser launch arguments that improve bot stability and stealth
-_CHROMIUM_ARGS = [
-    "--no-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-blink-features=AutomationControlled",
-    "--use-fake-ui-for-media-stream",   # auto-grants mic/camera prompts
-    "--disable-infobars",
-    "--disable-notifications",
-    "--start-maximized",
-]
-
-_IGNORE_ARGS = [
-    "--enable-automation",
-]
-
 
 class BrowserController:
     """High-level Playwright browser controller using a persistent profile.
@@ -82,44 +67,33 @@ class BrowserController:
         Raises:
             BrowserLaunchError: If Playwright is not installed or launch fails.
         """
-        try:
-            # pyrefly: ignore [missing-import]
-            from playwright.async_api import async_playwright  # lazy import
-        except ImportError as exc:
-            raise BrowserLaunchError(
-                "Playwright is not installed. "
-                "Run: pip install playwright && playwright install chromium",
-                retryable=False,
-            ) from exc
+        from app.meeting.bot.browser.factory import BrowserFactory
 
-        Path(profile_dir).mkdir(parents=True, exist_ok=True)
-        self._profile_dir = profile_dir
+        log.info(
+            "browser.launch_started",
+            headless=headless,
+            profile=profile_dir,
+        )
 
         try:
-            self._playwright = await async_playwright().start()
-            log.info(
-                "browser.launch_started",
+            session = await BrowserFactory.create(
+                profile_dir=profile_dir,
                 headless=headless,
-                profile=profile_dir,
+                page_timeout=page_timeout,
             )
-            self._context = await self._playwright.chromium.launch_persistent_context(
-                profile_dir,
-                headless=headless,
-                args=_CHROMIUM_ARGS,
-                ignore_default_args=_IGNORE_ARGS,
-                permissions=["camera", "microphone"],
-                viewport={"width": 1280, "height": 800},
-            )
-            # Apply default timeout to all future operations on this context
-            self._context.set_default_timeout(page_timeout)
+            self._playwright = session.playwright
+            self._context = session.context
+            self._profile_dir = str(session.profile_path)
+            
             log.info(
                 "browser.launch_completed",
                 headless=headless,
                 profile=profile_dir,
+                extension_loaded=session.extension_loaded,
             )
         except Exception as exc:
             await self.close()
-            raise BrowserLaunchError(f"Failed to launch browser: {exc}") from exc
+            raise
 
     async def new_page(self) -> Any:
         """Return an active page, reusing the existing one if available.

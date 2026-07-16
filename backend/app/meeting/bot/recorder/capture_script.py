@@ -64,13 +64,14 @@ CAPTURE_SCRIPT: str = """
             // Capture the tab's audio output — all participants, no mic
             // getDisplayMedia requires video: true, even if we only want audio
             stream = await navigator.mediaDevices.getDisplayMedia({
-                video: true,
+                video: { displaySurface: "browser" },
                 audio: {
                     echoCancellation: false,
                     noiseSuppression: false,
                     sampleRate: 48000,
                     channelCount: 2,
-                }
+                },
+                preferCurrentTab: true
             });
 
             // Stop the video track immediately to save CPU/memory

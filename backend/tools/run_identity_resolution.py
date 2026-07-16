@@ -28,7 +28,8 @@ from app.meeting.artifacts.speaker import (
 from app.meeting.attribution.service import SpeakerAttributionService
 from app.meeting.mapping.service import SpeakerMappingService
 from app.meeting.config import meeting_config
-from app.meeting.providers.participant_roster import get_roster_provider
+from app.meeting.providers.participant_presence import get_presence_provider
+from app.meeting.providers.participant_presence.roster_builder import ParticipantRosterBuilder
 
 def _find_latest(base_dir: Path, filename: str) -> Path | None:
     candidates = list(base_dir.rglob(filename))
@@ -68,13 +69,22 @@ async def main() -> None:
     original_segment_count = len(attributed.segments)
 
     # ------------------------------------------------------------------ #
-    # Fetch Roster via Provider                                            #
+    # Fetch Timeline & Build Roster                                        #
     # ------------------------------------------------------------------ #
-    provider = get_roster_provider()
+    provider = get_presence_provider(meeting_id=meeting_id)
     try:
-        roster = await provider.get_roster(meeting_id)
+        timeline_presence = await provider.collect(meeting_id)
+        builder = ParticipantRosterBuilder()
+        roster = builder.build(timeline_presence)
+        
+        # Save artifacts
+        out_presence_path = processed_dir / "participant_presence_timeline.json"
+        out_presence_path.write_text(timeline_presence.model_dump_json(indent=2), encoding="utf-8")
+        
+        out_roster_path = processed_dir / "participant_roster.json"
+        out_roster_path.write_text(roster.model_dump_json(indent=2), encoding="utf-8")
     except Exception as exc:
-        print(f"[ERROR] Provider failed: {exc}")
+        print(f"[ERROR] Provider or Builder failed: {exc}")
         sys.exit(1)
 
     # ------------------------------------------------------------------ #

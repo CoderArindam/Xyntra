@@ -21,7 +21,7 @@ stored and referenced across pipeline stages carry artifact overhead.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal, Union
 
 from pydantic import BaseModel, Field
 
@@ -67,10 +67,63 @@ class MeetingParticipant(BaseModel):
     email: Optional[str] = None
     join_time: str                  # ISO 8601
     leave_time: Optional[str] = None
+    first_seen: Optional[str] = None
+    last_seen: Optional[str] = None
     join_order: int                 # 1-indexed arrival order in the meeting
+    total_presence_duration: float = 0.0
+    join_events: List[str] = Field(default_factory=list)
+    leave_events: List[str] = Field(default_factory=list)
     is_host: bool = False
+    is_guest: bool = False
     is_bot: bool = False
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Presence Events (Raw Timeline)
+# ---------------------------------------------------------------------------
+
+class PresenceEvent(BaseModel):
+    """Base class for all presence events."""
+    event_id: str
+    sequence_number: int
+    timestamp: str                  # ISO 8601
+    source: str                     # e.g., GOOGLE_MEET, JSON, MANUAL
+    participant_id: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ParticipantJoined(PresenceEvent):
+    event_type: Literal["ParticipantJoined"] = "ParticipantJoined"
+    display_name: str
+
+
+class ParticipantLeft(PresenceEvent):
+    event_type: Literal["ParticipantLeft"] = "ParticipantLeft"
+
+
+class ParticipantRenamed(PresenceEvent):
+    event_type: Literal["ParticipantRenamed"] = "ParticipantRenamed"
+    new_display_name: str
+
+
+class HostTransferred(PresenceEvent):
+    event_type: Literal["HostTransferred"] = "HostTransferred"
+    new_host_id: str
+
+
+class ParticipantRejoined(PresenceEvent):
+    event_type: Literal["ParticipantRejoined"] = "ParticipantRejoined"
+    display_name: str
+
+
+AnyPresenceEvent = Union[
+    ParticipantJoined,
+    ParticipantLeft,
+    ParticipantRenamed,
+    HostTransferred,
+    ParticipantRejoined,
+]
 
 
 class SpeakerMappingEntry(BaseModel):
@@ -154,19 +207,32 @@ class SpeakerTimeline(MeetingArtifact):
     processing_version: str
 
 
-class ParticipantRoster(MeetingArtifact):
-    """Immutable snapshot of meeting participants from the platform runtime.
+class ParticipantPresenceTimeline(MeetingArtifact):
+    """Raw, immutable sequence of presence events during the meeting."""
 
-    Consumes:  Google Meet / Zoom / Teams participant events
+    meeting_started_at: str
+    recording_started_at: Optional[str] = None
+    timeline_started_at: str
+    events: List[AnyPresenceEvent] = Field(default_factory=list)
+    current_snapshot: List[MeetingParticipant] = Field(default_factory=list)
+    processing_version: str
+
+
+class ParticipantRoster(MeetingArtifact):
+    """Immutable snapshot of meeting participants reduced from the presence timeline.
+
+    Consumes:  ParticipantPresenceTimeline
     Produces:  ParticipantRoster (this artifact)
 
     No voice information.  No speaker labels.  Only identity.
     Participants are ordered by join_order for downstream heuristics.
     """
 
+    parent_presence_timeline_id: Optional[str] = None
     source: str                         # "google_meet" | "zoom" | "teams"
     participants: List[MeetingParticipant]
     captured_at: str                    # ISO 8601 — when the roster was finalized
+    processing_version: str = "1.0.0"
 
 
 class SpeakerMapping(MeetingArtifact):

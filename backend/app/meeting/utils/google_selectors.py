@@ -55,11 +55,9 @@ MEET_SELECTORS: dict[str, str] = {
 
     # ── In-meeting join indicators (used by confidence-based detector) ─
     # Each selector independently signals the bot is inside the meeting.
+    # Note: Mic/Camera/More are ambiguous because they exist in the pre-join lobby too!
     "indicator_leave":         'button[aria-label="Leave call"], button[aria-label="Leave"]',
-    "indicator_mic":           'button[aria-label="Turn off microphone"], button[aria-label="Turn on microphone"], button[data-is-muted]',
-    "indicator_camera":        'button[aria-label="Turn off camera"], button[aria-label="Turn on camera"]',
-    "indicator_more_options":  'button[aria-label="More options"], button[aria-label="More"]',
-    "indicator_people":        'button[aria-label="People"], button[aria-label="Show everyone"]',
+    "indicator_people":        '[role="button"]:has-text("People"), [role="button"]:has-text("Show everyone"), [aria-label="People"], [aria-label="Show everyone"]',
     "indicator_chat":          'button[aria-label="Chat with everyone"], button[aria-label="Open chat"]',
     "indicator_activities":    'button[aria-label="Activities"]',
     "indicator_toolbar":       '[data-call-collapsed], [jsname="P4eknd"], [jsname="haAclf"]',

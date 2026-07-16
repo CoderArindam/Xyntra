@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "KAIO Presence Integration",
+  "version": "1.0.0",
+  "description": "Production participant presence collection system for KAIO Bot running alongside Google Meet.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*"
+  ],
+  "background": {
+    "service_worker": "background/service_worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["shared/types.js", "content/GoogleMeetDOMAdapter.js", "content/meet_observer.js"]
+    }
+  ],
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": false
+  },
+  "action": {
+    "default_title": "KAIO Presence Settings"
+  }
+}

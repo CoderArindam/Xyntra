@@ -82,6 +82,13 @@ class MeetingSessionManager:
     def get(self, session_id: str) -> MeetingSession | None:
         return self._sessions.get(session_id)
 
+    def get_by_meeting_id(self, meeting_id: str) -> MeetingSession | None:
+        """Find a session by its Google Meet code (e.g. abc-defg-hij)."""
+        for session in self._sessions.values():
+            if session.meeting_url.endswith(meeting_id):
+                return session
+        return None
+
     def get_active(self) -> list[MeetingSession]:
         return [s for s in self._sessions.values() if s.status in ACTIVE_STATUSES]
 
