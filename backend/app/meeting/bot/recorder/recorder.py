@@ -172,6 +172,9 @@ class MeetingRecorder:
                 "recording.started",
                 session_id=self._session_id,
                 mime_type=actual_mime,
+                video_settings=result.get("videoSettings"),
+                audio_settings=result.get("audioSettings"),
+                audio_constraints=result.get("audioConstraints"),
             )
 
         except RecordingInitError:

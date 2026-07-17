@@ -15,6 +15,7 @@ from .speaker import (
     ParticipantAttributedTranscript,
 )
 from .transcript import (
+    WordInfo,
     TranscriptSegment,
     SpeakerSegment,
     RawTranscript,
@@ -25,12 +26,22 @@ from .transcript import (
 )
 from .intelligence import MeetingInsights
 from .task import DecisionItem, ActionItem, ExtractedTask, TaskProposal
+from .attribution_debug import (
+    RuleTrace,
+    CandidateScores,
+    AttributionDecision,
+    AttributionStatistics,
+    AttributionTimelineItem,
+    AttributionDebugArtifact,
+    AttributionTimelineArtifact,
+)
 
 __all__ = [
     "MeetingArtifact",
     "MeetingRecording",
     "AudioSegment",
     "ProcessedAudio",
+    "WordInfo",
     "TranscriptSegment",
     "SpeakerSegment",
     "RawTranscript",
@@ -55,4 +66,12 @@ __all__ = [
     "SpeakerMapping",
     "SpeakerAttributedTranscript",
     "ParticipantAttributedTranscript",
+    # Observability & Debugging
+    "RuleTrace",
+    "CandidateScores",
+    "AttributionDecision",
+    "AttributionStatistics",
+    "AttributionTimelineItem",
+    "AttributionDebugArtifact",
+    "AttributionTimelineArtifact",
 ]

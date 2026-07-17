@@ -171,6 +171,17 @@ class TranscriptNormalizationError(MeetingError):
         )
 
 
+class TranscriptIntegrityError(MeetingError):
+    """Transcript integrity validation failed (critical segment loss or corruption)."""
+    def __init__(self, message: str, *, retryable: bool = False) -> None:
+        super().__init__(
+            code="TRANSCRIPT_INTEGRITY_ERROR",
+            message=message,
+            recoverable=False,
+            retryable=retryable,
+        )
+
+
 class DiarizationError(MeetingError):
     """Speaker diarization provider failed."""
     def __init__(self, message: str, *, retryable: bool = True) -> None:
@@ -224,3 +235,60 @@ class ParticipantProviderUnavailable(MeetingError):
             recoverable=False,
             retryable=False,
         )
+
+
+# ---------------------------------------------------------------------------
+# Speech Provider (unified STT + diarization)
+# ---------------------------------------------------------------------------
+
+class SpeechProviderError(MeetingError):
+    """Base for all unified speech provider errors."""
+    def __init__(self, message: str, *, retryable: bool = False) -> None:
+        super().__init__(
+            code="SPEECH_PROVIDER_ERROR",
+            message=message,
+            recoverable=False,
+            retryable=retryable,
+        )
+
+
+class SpeechProviderAuthError(SpeechProviderError):
+    """Invalid or missing API key — never retryable."""
+    def __init__(self, message: str = "Speech provider authentication failed") -> None:
+        super().__init__(message, retryable=False)
+        self.code = "SPEECH_PROVIDER_AUTH_ERROR"
+
+
+class SpeechProviderRateLimitError(SpeechProviderError):
+    """HTTP 429 — retryable after backoff."""
+    def __init__(self, message: str = "Speech provider rate limit exceeded") -> None:
+        super().__init__(message, retryable=True)
+        self.code = "SPEECH_PROVIDER_RATE_LIMIT"
+
+
+class SpeechProviderTimeoutError(SpeechProviderError):
+    """Request timed out — retryable."""
+    def __init__(self, message: str = "Speech provider request timed out") -> None:
+        super().__init__(message, retryable=True)
+        self.code = "SPEECH_PROVIDER_TIMEOUT"
+
+
+class SpeechProviderConfigError(SpeechProviderError):
+    """Missing or invalid provider configuration — never retryable."""
+    def __init__(self, message: str) -> None:
+        super().__init__(message, retryable=False)
+        self.code = "SPEECH_PROVIDER_CONFIG_ERROR"
+
+
+class SpeechProviderValidationError(SpeechProviderError):
+    """Malformed request or response (HTTP 400, bad audio, etc.) — never retryable."""
+    def __init__(self, message: str) -> None:
+        super().__init__(message, retryable=False)
+        self.code = "SPEECH_PROVIDER_VALIDATION_ERROR"
+
+
+class SpeechProviderUnavailableError(SpeechProviderError):
+    """Provider is temporarily unavailable (HTTP 503) — retryable."""
+    def __init__(self, message: str = "Speech provider temporarily unavailable") -> None:
+        super().__init__(message, retryable=True)
+        self.code = "SPEECH_PROVIDER_UNAVAILABLE"

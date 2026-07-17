@@ -153,13 +153,18 @@ class SpeakerAttributedSegment(BaseModel):
     """
 
     segment_id: str
+    raw_segment_id: Optional[str] = None
+    source_stage: str = "alignment"
+    processing_history: List[str] = Field(default_factory=list)
     start_time: float
     end_time: float
     text: str
     speaker_label: Optional[str] = None         # None if no turn matched
     diarization_confidence: Optional[float] = None
     attribution_confidence: Optional[float] = None
+    confidence: Optional[float] = None
     language: str = "unknown"
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ParticipantAttributedSegment(BaseModel):
@@ -170,6 +175,9 @@ class ParticipantAttributedSegment(BaseModel):
     """
 
     segment_id: str
+    raw_segment_id: Optional[str] = None
+    source_stage: str = "resolution"
+    processing_history: List[str] = Field(default_factory=list)
     start_time: float
     end_time: float
     text: str
@@ -178,7 +186,10 @@ class ParticipantAttributedSegment(BaseModel):
     participant_id: Optional[str] = None
     participant_name: Optional[str] = None
     mapping_confidence: Optional[float] = None
+    confidence: Optional[float] = None
     language: str = "unknown"
+    resolution_reason: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------

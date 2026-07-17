@@ -7,6 +7,18 @@ from pydantic import Field
 from .base import MeetingArtifact
 
 
+class WordInfo(MeetingArtifact):
+    """Word-level timing and speaker metadata from STT provider."""
+
+    word: str
+    start: float
+    end: float
+    confidence: Optional[float] = None
+    speaker: Optional[str] = None
+    speaker_confidence: Optional[float] = None
+    punctuated_word: Optional[str] = None
+
+
 class TranscriptSegment(MeetingArtifact):
     """An individual spoken segment from STT output."""
 
@@ -15,15 +27,19 @@ class TranscriptSegment(MeetingArtifact):
     end_time: float
     text: str
 
-    # Raw Whisper / provider-specific metrics
-    avg_logprob: float
-    no_speech_probability: float
-    compression_ratio: float
+    # Whisper-specific quality metrics — Optional for provider-agnostic compatibility.
+    # Deepgram does not produce these; they default to None for cloud providers.
+    avg_logprob: Optional[float] = None
+    no_speech_probability: Optional[float] = None
+    compression_ratio: Optional[float] = None
 
-    # Derived/abstract metrics
+    # Provider-independent quality
     confidence: Optional[float] = None
     speaker: Optional[str] = None
     detected_language: str = "unknown"
+
+    # Word-level data (populated by providers that support it, e.g. Deepgram)
+    words: List[WordInfo] = Field(default_factory=list)
 
 
 class SpeakerSegment(MeetingArtifact):
@@ -63,6 +79,9 @@ class NormalizedTranscriptSegment(MeetingArtifact):
     """
 
     id: str
+    raw_segment_id: Optional[str] = None
+    source_stage: str = "normalization"
+    processing_history: List[str] = Field(default_factory=list)
     start_time: float
     end_time: float
     text: str
@@ -84,10 +103,29 @@ class NormalizationStatistics(MeetingArtifact):
     rule_statistics: Dict[str, int] = Field(default_factory=dict)
     total_input_segments: int = 0
     total_output_segments: int = 0
+    total_input_words: int = 0
+    total_output_words: int = 0
+    total_input_characters: int = 0
+    total_output_characters: int = 0
+    total_input_duration_seconds: float = 0.0
+    total_output_duration_seconds: float = 0.0
     removed_segments: int = 0
     merged_segments: int = 0
     processing_time_ms: int = 0
     average_segment_length: float = 0.0
+    average_confidence: Optional[float] = None
+
+
+class SegmentationStatistics(MeetingArtifact):
+    """Statistics collected during conversation turn segmentation layer."""
+
+    total_input_segments: int = 0
+    total_output_segments: int = 0
+    segments_split: int = 0
+    average_duration_before: float = 0.0
+    average_duration_after: float = 0.0
+    candidate_switches_detected: int = 0
+    processing_time_ms: int = 0
 
 
 class NormalizedTranscript(MeetingArtifact):

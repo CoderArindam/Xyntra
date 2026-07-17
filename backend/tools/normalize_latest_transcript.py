@@ -30,10 +30,10 @@ from app.meeting.exceptions import TranscriptNormalizationError
 from app.meeting.normalization.service import TranscriptNormalizationService
 
 
-def _find_latest_transcript(recordings_dir: Path) -> Path | None:
+def _find_latest_transcript(storage_dir: Path) -> Path | None:
     candidates = [
-        *recordings_dir.rglob("*.groq.transcript.json"),
-        *recordings_dir.rglob("raw_transcript_v1.json"),
+        *storage_dir.rglob("*.groq.transcript.json"),
+        *storage_dir.rglob("raw_transcript_v1.json"),
     ]
     if not candidates:
         return None
@@ -45,10 +45,10 @@ async def main() -> None:
     print("KAIO Developer Tool: Transcript Normalization Pipeline (M2.4)")
     print("=" * 60)
 
-    recordings_dir = Path(meeting_config.RECORDING_OUTPUT_DIR)
+    storage_dir = Path("storage") / "meeting"
 
-    print(f"\n[0] Locating latest transcript in {recordings_dir} ...")
-    transcript_path = _find_latest_transcript(recordings_dir)
+    print(f"\n[0] Locating latest transcript in {storage_dir} ...")
+    transcript_path = _find_latest_transcript(storage_dir)
 
     if not transcript_path:
         print(f"    [ERROR] No transcript JSON found in {recordings_dir}")
@@ -116,6 +116,10 @@ async def main() -> None:
     print(f"    Processing version:  {normalized.processing_version}")
     print(f"    Input Segments:      {input_n}")
     print(f"    Output Segments:     {output_n}")
+    print(f"    Words (in -> out):   {stats.total_input_words} -> {stats.total_output_words}")
+    print(f"    Chars (in -> out):   {stats.total_input_characters} -> {stats.total_output_characters}")
+    print(f"    Duration (in -> out):{stats.total_input_duration_seconds:.2f}s -> {stats.total_output_duration_seconds:.2f}s")
+    print(f"    Average Confidence:  {stats.average_confidence}")
     print(f"    Segments Removed:    {removed_n}  (whitespace-only)")
     print(f"    Segments Merged:     0  (merging disabled)")
     print(f"    Avg segment length:  {stats.average_segment_length:.1f} chars")
@@ -142,7 +146,8 @@ async def main() -> None:
     print(f"\nPreview of first 5 normalized segments:")
     for seg in normalized.segments[:5]:
         speaker = seg.speaker or "unknown"
-        print(f"  [{seg.start_time:.2f}s → {seg.end_time:.2f}s] ({speaker}) {seg.text}")
+        raw_id = seg.raw_segment_id or "N/A"
+        print(f"  [{seg.start_time:.2f}s → {seg.end_time:.2f}s] (orig:{raw_id}) ({speaker}) {seg.text}")
 
 
 if __name__ == "__main__":

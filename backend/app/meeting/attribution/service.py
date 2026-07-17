@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 
 from app.meeting.artifacts.speaker import (
     ParticipantAttributedSegment,
@@ -28,7 +28,15 @@ from app.meeting.artifacts.speaker import (
     SpeakerMapping,
     SpeakerTimeline,
     SpeakerTurn,
+    ParticipantRoster,
+    ParticipantPresenceTimeline,
+    MeetingParticipant,
 )
+from app.meeting.artifacts.attribution_debug import (
+    AttributionDebugArtifact,
+    AttributionTimelineArtifact,
+)
+from app.meeting.attribution.dynamic_engine import DynamicAttributionEngine
 from app.meeting.artifacts.transcript import NormalizedTranscript, NormalizedTranscriptSegment
 from app.meeting.config import meeting_config
 from app.meeting.exceptions import SpeakerAttributionError
@@ -37,69 +45,58 @@ from app.meeting.logger import get_logger
 log = get_logger("attribution.service")
 
 class SpeakerAttributionService:
-    """Performs participant identity resolution.
-    
-    Stage 1 align() was moved to alignment.service.
-    """
+    """Performs participant identity resolution using DynamicAttributionEngine."""
 
-    # ------------------------------------------------------------------ #
-    # Stage 2 — resolve                                                    #
-    # ------------------------------------------------------------------ #
-
-    async def resolve(
+    async def resolve_with_debug(
         self,
         attributed: SpeakerAttributedTranscript,
-        mapping: Optional[SpeakerMapping],
-    ) -> ParticipantAttributedTranscript:
-        """Apply a SpeakerMapping to produce participant-attributed segments.
-
-        speaker_label is always preserved. participant_* fields are nullable
-        when no mapping entry exists for a label or mapping is None.
-        The SpeakerMapping is never modified here — it is consumed read-only.
-        """
+        mapping: Optional[SpeakerMapping] = None,
+        roster: Optional[ParticipantRoster] = None,
+        presence_timeline: Optional[ParticipantPresenceTimeline] = None,
+    ) -> Tuple[ParticipantAttributedTranscript, AttributionDebugArtifact, AttributionTimelineArtifact]:
+        """Perform dynamic per-turn attribution and return transcript with debug artifacts."""
         log.info(
             "attribution.resolution.started",
             meeting_id=attributed.meeting_id,
             attributed_transcript_id=attributed.id,
             mapping_id=mapping.id if mapping else None,
+            roster_id=roster.id if roster else None,
         )
 
         start_dt = datetime.now(timezone.utc)
         t0 = time.monotonic()
 
         try:
-            # Build a fast lookup from speaker_label → mapping entry
-            label_map: dict[str, tuple[Optional[str], Optional[str], Optional[float]]] = {}
-            if mapping:
-                for entry in mapping.entries:
-                    label_map[entry.speaker_label] = (
-                        entry.participant_id,
-                        entry.participant_name,
-                        entry.mapping_confidence,
-                    )
+            participants: List[MeetingParticipant] = []
+            if roster and roster.participants:
+                participants = [p for p in roster.participants if not p.is_bot and p.participant_id != "UNKNOWN_PARTICIPANT"]
+            elif mapping and mapping.entries:
+                seen_ids = set()
+                for idx, entry in enumerate(mapping.entries):
+                    if (
+                        entry.participant_id 
+                        and entry.participant_id != "UNKNOWN_PARTICIPANT" 
+                        and entry.participant_id not in seen_ids
+                    ):
+                        seen_ids.add(entry.participant_id)
+                        participants.append(
+                            MeetingParticipant(
+                                participant_id=entry.participant_id,
+                                display_name=entry.participant_name or entry.participant_id,
+                                join_time="2026-01-01T00:00:00Z",
+                                join_order=idx + 1,
+                            )
+                        )
 
-            resolved_segments: list[ParticipantAttributedSegment] = []
-            unresolved = 0
-
-            for seg in attributed.segments:
-                pid, pname, mconf = label_map.get(seg.speaker_label or "", (None, None, None))
-                if pid is None and seg.speaker_label is not None:
-                    unresolved += 1
-
-                resolved_segments.append(
-                    ParticipantAttributedSegment(
-                        segment_id=seg.segment_id,
-                        start_time=seg.start_time,
-                        end_time=seg.end_time,
-                        text=seg.text,
-                        speaker_label=seg.speaker_label,           # always preserved
-                        speaker_label_confidence=seg.diarization_confidence,
-                        participant_id=pid,
-                        participant_name=pname,
-                        mapping_confidence=mconf,
-                        language=seg.language,
-                    )
-                )
+            engine = DynamicAttributionEngine()
+            resolved_segments, debug_artifact, timeline_artifact = engine.attribute(
+                attributed_segments=attributed.segments,
+                participants=participants,
+                mapping=mapping,
+                presence_timeline=presence_timeline,
+                meeting_id=attributed.meeting_id,
+            )
+            unresolved = sum(1 for s in resolved_segments if s.participant_id is None)
 
         except Exception as exc:
             log.error(
@@ -136,6 +133,11 @@ class SpeakerAttributionService:
             processing_version=meeting_config.ATTRIBUTION_PROCESSING_VERSION,
         )
 
+        from app.meeting.normalization.validator import TranscriptIntegrityValidator
+        validator = TranscriptIntegrityValidator()
+        integrity_res = validator.validate_speaker_to_participant(attributed, artifact)
+        validator.raise_for_errors(integrity_res)
+
         log.info(
             "attribution.resolution.completed",
             meeting_id=attributed.meeting_id,
@@ -151,4 +153,20 @@ class SpeakerAttributionService:
             meeting_id=attributed.meeting_id,
         )
 
+        return artifact, debug_artifact, timeline_artifact
+
+    async def resolve(
+        self,
+        attributed: SpeakerAttributedTranscript,
+        mapping: Optional[SpeakerMapping] = None,
+        roster: Optional[ParticipantRoster] = None,
+        presence_timeline: Optional[ParticipantPresenceTimeline] = None,
+    ) -> ParticipantAttributedTranscript:
+        """Perform dynamic per-turn attribution to produce participant-attributed segments."""
+        artifact, _, _ = await self.resolve_with_debug(
+            attributed=attributed,
+            mapping=mapping,
+            roster=roster,
+            presence_timeline=presence_timeline,
+        )
         return artifact

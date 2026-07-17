@@ -1,1 +1,0 @@
-"""Transcription pipeline (placeholder)."""

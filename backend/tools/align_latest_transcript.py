@@ -40,24 +40,23 @@ async def main() -> None:
     print("KAIO Developer Tool: Speaker Alignment Engine (M2.6.1)")
     print("=" * 60)
 
-    recordings_dir = Path(meeting_config.RECORDING_OUTPUT_DIR)
-    processed_dir = Path(meeting_config.PROCESSING_OUTPUT_DIR)
+    storage_dir = Path("storage") / "meeting"
 
     # ------------------------------------------------------------------ #
     # Locate artifacts                                                     #
     # ------------------------------------------------------------------ #
     print("\n[0] Locating artifacts ...")
 
-    transcript_path = _find_latest(recordings_dir, "normalized_transcript.json")
+    transcript_path = _find_latest(storage_dir, "normalized_transcript.json")
     if not transcript_path:
-        print(f"    [ERROR] No normalized_transcript.json in {recordings_dir}")
+        print(f"    [ERROR] No normalized_transcript.json in {storage_dir}")
         sys.exit(1)
     print(f"    [OK] Transcript: {transcript_path.name}")
     print(f"    Session: {transcript_path.parent.name}")
 
-    timeline_path = _find_latest(processed_dir, "speaker_timeline.json")
+    timeline_path = _find_latest(storage_dir, "speaker_timeline.json")
     if not timeline_path:
-        print(f"    [ERROR] No speaker_timeline.json in {processed_dir}")
+        print(f"    [ERROR] No speaker_timeline.json in {storage_dir}")
         sys.exit(1)
     print(f"    [OK] Timeline:   {timeline_path.name}")
     print(f"    Session: {timeline_path.parent.name}")

@@ -61,6 +61,7 @@ class MeetingSettings(BaseSettings):
     # ------------------------------------------------------------------ #
     DEBUG_DIR: str = str(Path("storage") / "meeting" / "debug")
     SCREENSHOT_ON_FAILURE: bool = True
+    DEBUG_ATTRIBUTION: bool = False
 
     # ------------------------------------------------------------------ #
     # Concurrency                                                          #
@@ -71,9 +72,7 @@ class MeetingSettings(BaseSettings):
     # ------------------------------------------------------------------ #
     # Pipeline & Processing                                                #
     # ------------------------------------------------------------------ #
-    STT_PROVIDER: str = "whisper"
-    STT_MULTILINGUAL_ENABLED: bool = True
-    DIARIZATION_PROVIDER: str = "pyannote"
+    SPEECH_PROVIDER: str = "deepgram"       # active speech engine
     INTELLIGENCE_PROVIDER: str = "gemini"
     TRANSLATION_PROVIDER: str = ""
     EMBEDDING_PROVIDER: str = ""
@@ -89,35 +88,30 @@ class MeetingSettings(BaseSettings):
     RECORDING_SAMPLE_RATE: int = 48000
     RECORDING_MAX_DURATION: int = 14400      # seconds — 4 hours hard cap
     RECORDING_BUFFER_SIZE: int = 10_485_760  # bytes  — 10 MB in-memory buffer
+
     # ------------------------------------------------------------------ #
     # Audio Processing                                                     #
     # ------------------------------------------------------------------ #
     PROCESSING_OUTPUT_DIR: str = str(Path("storage") / "meeting" / "processed_audio")
     CANONICAL_SAMPLE_RATE: int = 16000       # Hz — optimal for STT
-    CANONICAL_CHANNELS: int = 1             # mono
-    CANONICAL_FORMAT: str = "wav"           # uncompressed for STT fidelity
-    MIN_RECORDING_DURATION: float = 1.0     # seconds — reject very short recordings
-    MAX_RECORDING_SIZE: int = 2_147_483_648 # bytes — 2 GB
+    CANONICAL_CHANNELS: int = 1              # mono
+    CANONICAL_FORMAT: str = "wav"            # uncompressed for STT fidelity
+    MIN_RECORDING_DURATION: float = 1.0      # seconds — reject very short recordings
+    MAX_RECORDING_SIZE: int = 2_147_483_648  # bytes — 2 GB
     ENABLE_AUDIO_NORMALIZATION: bool = True
     FFMPEG_PATH: str = "ffmpeg"
     FFPROBE_PATH: str = "ffprobe"
+
     # ------------------------------------------------------------------ #
-    # Speech-to-Text (STT)                                                 #
+    # Deepgram Speech Provider                                             #
     # ------------------------------------------------------------------ #
-    WHISPER_MODEL: str = "small"
-    WHISPER_DEVICE: str = "cpu"
-    WHISPER_COMPUTE_TYPE: str = "int8"
-    WHISPER_BEAM_SIZE: int = 5
-    WHISPER_LANGUAGE: str = ""
-    WHISPER_ENABLE_VAD: bool = True
-    WHISPER_BATCH_SIZE: int = 8
-    # ------------------------------------------------------------------ #
-    # Experimental: Groq Speech-to-Text                                    #
-    # ------------------------------------------------------------------ #
-    GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "whisper-large-v3"
-    GROQ_TIMEOUT: int = 300
-    GROQ_MAX_RETRIES: int = 3
+    DEEPGRAM_API_KEY: str = ""
+    DEEPGRAM_MODEL: str = "nova-3"
+    DEEPGRAM_LANGUAGE: str = ""             # "" = auto-detect
+    DEEPGRAM_TIMEOUT: int = 300             # seconds
+    DEEPGRAM_MAX_RETRIES: int = 3
+    DEEPGRAM_BASE_DELAY: float = 1.0        # retry backoff base (seconds)
+    DEEPGRAM_MAX_DELAY: float = 60.0        # retry backoff cap (seconds)
 
     # ------------------------------------------------------------------ #
     # Transcript Normalization                                             #
@@ -142,10 +136,17 @@ class MeetingSettings(BaseSettings):
     NORMALIZATION_PROCESSING_VERSION: str = "1.0.0"
 
     # ------------------------------------------------------------------ #
-    # Speaker Diarization (Pyannote)                                       #
+    # Conversation Turn Segmentation                                       #
     # ------------------------------------------------------------------ #
-    DIARIZATION_PYANNOTE_AUTH_TOKEN: str = ""
-    DIARIZATION_PYANNOTE_MODEL: str = "pyannote/speaker-diarization-3.1"
+    SEGMENTATION_MAX_DURATION_SEC: float = 8.0
+    SEGMENTATION_MAX_CHARACTERS: int = 150
+    SEGMENTATION_MIN_UNTOUCHED_DURATION_SEC: float = 5.0
+    SEGMENTATION_PROCESSING_VERSION: str = "1.0.0"
+
+    # ------------------------------------------------------------------ #
+    # Speaker Diarization — config used by provider normalizer             #
+    # Note: Pyannote is removed. These bounds are passed to Deepgram.     #
+    # ------------------------------------------------------------------ #
     DIARIZATION_MIN_SPEAKERS: int = 1
     DIARIZATION_MAX_SPEAKERS: int = 10
     DIARIZATION_PROCESSING_VERSION: str = "1.0.0"

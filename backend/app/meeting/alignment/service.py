@@ -175,13 +175,18 @@ class SpeakerAlignmentService(SpeakerAlignmentProvider):
                 attributed_segments.append(
                     SpeakerAttributedSegment(
                         segment_id=seg.id,
+                        raw_segment_id=seg.raw_segment_id,
+                        source_stage="alignment",
+                        processing_history=[*seg.processing_history, "speaker_alignment"],
                         start_time=seg.start_time,
                         end_time=seg.end_time,
                         text=seg.text,
                         speaker_label=best_speaker,
                         diarization_confidence=diar_conf,
                         attribution_confidence=final_score if best_speaker else None,
+                        confidence=seg.confidence,
                         language=seg.language,
+                        metadata=dict(seg.metadata),
                     )
                 )
 
@@ -214,6 +219,11 @@ class SpeakerAlignmentService(SpeakerAlignmentProvider):
             attribution_duration_ms=duration_ms,
             processing_version=meeting_config.ALIGNMENT_PROCESSING_VERSION,
         )
+
+        from app.meeting.normalization.validator import TranscriptIntegrityValidator
+        validator = TranscriptIntegrityValidator()
+        integrity_res = validator.validate_normalized_to_speaker(transcript, artifact)
+        validator.raise_for_errors(integrity_res)
 
         log.info(
             "alignment.completed",

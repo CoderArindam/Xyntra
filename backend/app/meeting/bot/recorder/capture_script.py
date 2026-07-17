@@ -74,6 +74,19 @@ CAPTURE_SCRIPT: str = """
                 preferCurrentTab: true
             });
 
+            const videoTrack = stream.getVideoTracks()[0];
+            const audioTrack = stream.getAudioTracks()[0];
+
+            const videoSettings = videoTrack ? videoTrack.getSettings() : null;
+            const audioSettings = audioTrack ? audioTrack.getSettings() : null;
+            const audioConstraints = audioTrack && typeof audioTrack.getConstraints === 'function' 
+                ? audioTrack.getConstraints() 
+                : null;
+
+            console.log('[KAIO] Video Track Settings:', videoSettings);
+            console.log('[KAIO] Audio Track Settings:', audioSettings);
+            console.log('[KAIO] Audio Track Constraints:', audioConstraints);
+
             // Stop the video track immediately to save CPU/memory
             stream.getVideoTracks().forEach(function(track) {
                 track.stop();
@@ -107,7 +120,13 @@ CAPTURE_SCRIPT: str = """
 
             mediaRecorder.start(timesliceMs);
             console.log('[KAIO] Recording started, mime:', selectedMime);
-            return { ok: true, mimeType: selectedMime };
+            return { 
+                ok: true, 
+                mimeType: selectedMime,
+                videoSettings: videoSettings,
+                audioSettings: audioSettings,
+                audioConstraints: audioConstraints
+            };
 
         } catch (err) {
             console.error('[KAIO] Failed to start recording:', err);

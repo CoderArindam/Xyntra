@@ -7,6 +7,7 @@ from .speaker_resolution import SpeakerResolutionProvider
 from .transcript import TranscriptNormalizer, TranscriptBuilder
 from .intelligence import MeetingIntelligenceProvider
 from .extraction import TaskExtractor
+from .speech_provider import SpeechProvider, SpeechResult
 
 __all__ = [
     "AudioProcessor",
@@ -19,4 +20,6 @@ __all__ = [
     "TranscriptBuilder",
     "MeetingIntelligenceProvider",
     "TaskExtractor",
+    "SpeechProvider",
+    "SpeechResult",
 ]

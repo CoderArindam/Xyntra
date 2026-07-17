@@ -34,6 +34,8 @@ class ArtifactRegistry:
             "participant_attributed_transcript": "participant_attributed_transcript.json",
             "participant_presence_timeline": "participant_presence_timeline.json",
             "normalized_transcript": "normalized_transcript.json",
+            "attribution_debug_artifact": "attribution_debug.json",
+            "attribution_timeline_artifact": "attribution_timeline.json",
             # Assuming raw transcript from Whisper
             "raw_transcript": "raw_transcript_v1.json" 
         }

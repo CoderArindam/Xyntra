@@ -41,25 +41,24 @@ async def main() -> None:
     print("KAIO Developer Tool: Speaker Identity Resolution (M2.7)")
     print("=" * 60)
 
-    recordings_dir = Path(meeting_config.RECORDING_OUTPUT_DIR)
-    processed_dir = Path(meeting_config.PROCESSING_OUTPUT_DIR)
+    storage_dir = Path("storage") / "meeting"
 
     # ------------------------------------------------------------------ #
     # Locate artifacts                                                     #
     # ------------------------------------------------------------------ #
     print("\n[0] Locating artifacts ...")
 
-    attributed_path = _find_latest(recordings_dir, "speaker_attributed_transcript.json")
+    attributed_path = _find_latest(storage_dir, "speaker_attributed_transcript.json")
     if not attributed_path:
-        print(f"    [ERROR] No speaker_attributed_transcript.json in {recordings_dir}")
+        print(f"    [ERROR] No speaker_attributed_transcript.json in {storage_dir}")
         sys.exit(1)
     
-    timeline_path = _find_latest(processed_dir, "speaker_timeline.json")
+    timeline_path = _find_latest(storage_dir, "speaker_timeline.json")
     if not timeline_path:
-        print(f"    [ERROR] No speaker_timeline.json in {processed_dir}")
+        print(f"    [ERROR] No speaker_timeline.json in {storage_dir}")
         sys.exit(1)
 
-    roster_path = _find_latest(processed_dir, "participant_roster.json")
+    roster_path = _find_latest(storage_dir, "participant_roster.json")
     if not roster_path:
         print(f"    [WARN] No participant_roster.json found. Using empty roster.")
 
