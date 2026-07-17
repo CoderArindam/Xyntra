@@ -149,6 +149,28 @@ class DeepgramSpeechProvider(SpeechProvider):
     ) -> TranscriptionResult:
         audio_bytes = self._read_audio(audio.file_path)
 
+        # Phase 0X: Deepgram input verification
+        try:
+            session_id = audio.meeting_id
+            out_dir = Path(meeting_config.PROCESSING_OUTPUT_DIR) / session_id
+            out_dir.mkdir(parents=True, exist_ok=True)
+
+            dg_wav = out_dir / "deepgram_input.wav"
+            dg_webm = out_dir / "deepgram_input.webm"
+
+            # Save the exact file sent to Deepgram if not present
+            if not dg_wav.exists() and audio.file_path.endswith(".wav"):
+                dg_wav.write_bytes(audio_bytes)
+            
+            # Look for recorded.webm in the same session dir or recording storage
+            recorded_webm = out_dir / "recorded.webm"
+            if recorded_webm.exists() and not dg_webm.exists():
+                dg_webm.write_bytes(recorded_webm.read_bytes())
+
+            log.info("speech.deepgram.input_verified", session_id=session_id, wav_exists=dg_wav.exists(), webm_exists=dg_webm.exists())
+        except Exception as exc:
+            log.warning("speech.deepgram.input_verification_warning", error=str(exc))
+
         # Build kwargs for transcribe_file (SDK v7 flat-kwargs style)
         transcribe_kwargs = dict(
             request=audio_bytes,
@@ -176,6 +198,7 @@ class DeepgramSpeechProvider(SpeechProvider):
             metrics.mark_provider_end()
 
         return self._normalize_response(response, metrics)
+
 
     def _read_audio(self, file_path: str) -> bytes:
         path = Path(file_path)

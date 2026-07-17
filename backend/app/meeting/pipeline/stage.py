@@ -53,6 +53,11 @@ class PipelineStage(ABC):
         """Whether the pipeline should continue if this stage fails."""
         return False
 
+    @property
+    def skippable(self) -> bool:
+        """Whether this stage can be skipped if its outputs already exist."""
+        return True
+
     def validate_inputs(self, context: PipelineContext) -> None:
         """Ensure all required inputs exist."""
         missing = []

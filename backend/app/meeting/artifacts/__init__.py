@@ -35,6 +35,11 @@ from .attribution_debug import (
     AttributionDebugArtifact,
     AttributionTimelineArtifact,
 )
+from .audio_debug import (
+    AudioTrackMetadata,
+    AudioGraphNodeInfo,
+    AudioCaptureDebugArtifact,
+)
 
 __all__ = [
     "MeetingArtifact",
@@ -74,4 +79,8 @@ __all__ = [
     "AttributionTimelineItem",
     "AttributionDebugArtifact",
     "AttributionTimelineArtifact",
+    "AudioTrackMetadata",
+    "AudioGraphNodeInfo",
+    "AudioCaptureDebugArtifact",
 ]
+

@@ -18,3 +18,5 @@ class BrowserSession:
     context: Any
     profile_path: Path
     extension_loaded: bool
+    browser_launch_audit: dict[str, Any] | None = None
+

@@ -36,6 +36,10 @@ class ConversationSegmentationStage(PipelineStage):
     def continue_on_failure(self) -> bool:
         return False
 
+    @property
+    def skippable(self) -> bool:
+        return False
+
     async def execute(self, context: PipelineContext) -> StageStatus:
         transcript = context.artifacts.get(NormalizedTranscript)
         if not transcript:

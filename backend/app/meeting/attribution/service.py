@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional,Tuple
 
 from app.meeting.artifacts.speaker import (
     ParticipantAttributedSegment,

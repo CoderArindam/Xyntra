@@ -1,23 +1,11 @@
-"""Dynamic Speaker Attribution Engine (Phase 2.5).
+"""Conversation State Engine (Phase 2.6).
 
-Production-grade, deterministic, O(n) local attribution engine with
-full observability and explainability trace generation.
-No LLM. No AI. No external APIs. No network calls. No statistical models.
-
-Performs per-segment participant identity resolution using weighted evidence signals:
-  1. Presence overlap & join/leave windows (hard disqualification)
-  2. Vocative detection ("Hey Shivam" -> speaker is NOT Shivam)
-  3. Weighted Q&A & dialogue alternation
-  4. Weighted short acknowledgement detection
-  5. Consecutive turn heuristic
-  6. Deepgram speaker label prior (weak prior)
-  7. Temporal continuity
-  8. Join-order fallback (absolute last resort)
+Production-grade, deterministic, O(n) local conversation state attribution engine.
+No LLM. No AI. No external APIs. No network calls. No language-specific keyword dictionaries.
 """
 
 from __future__ import annotations
 
-import re
 import time
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional, Set, Tuple
@@ -25,7 +13,6 @@ from typing import List, Dict, Any, Optional, Set, Tuple
 from app.meeting.artifacts.speaker import (
     SpeakerAttributedSegment,
     ParticipantAttributedSegment,
-    ParticipantAttributedTranscript,
     MeetingParticipant,
     SpeakerMapping,
     ParticipantPresenceTimeline,
@@ -39,86 +26,26 @@ from app.meeting.artifacts.attribution_debug import (
     AttributionDebugArtifact,
     AttributionTimelineArtifact,
 )
+from app.meeting.attribution.conversation_state import ConversationState
+from app.meeting.attribution.providers import (
+    EvidenceProvider,
+    PresenceEvidenceProvider,
+    VocativeEvidenceProvider,
+    TemporalContinuityProvider,
+    ConversationalTransitionProvider,
+    OwnershipProvider,
+    AlternationProvider,
+    InterruptionProvider,
+    SegmentationProvider,
+    DeepgramPriorProvider,
+)
 from app.meeting.config import meeting_config
 from app.meeting.logger import get_logger
 
-log = get_logger("attribution.dynamic_engine")
+log = get_logger("attribution.state_engine")
 
-# Sentence punctuation regex
-_SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.?!।])\s+")
-
-# Short acknowledgement phrases (case-insensitive)
-_ACKNOWLEDGEMENTS: Set[str] = {
-    "yes", "okay", "sure", "exactly", "right", "no", "hmm", "hm", "yeah", "yep", "nope",
-    "got it", "thanks", "thank you", "yes sir", "no sir", "fine", "understood", "true",
-    "i know", "ok", "haan", "thik hai", "sahi", "thik ache", "dhanyabad", "dhanyavaad",
-    "have a good day", "bye", "goodbye", "see you", "correct", "of course"
-}
-
-# Question prefix words
-_QUESTION_WORDS: Set[str] = {
-    "how", "what", "why", "who", "where", "when", "can", "could", "would", "should",
-    "is", "are", "do", "does", "did", "kyun", "kya", "kaise", "kahan", "keeno", "kine"
-}
-
-# Common greeting words
-_GREETING_WORDS: Set[str] = {
-    "hey", "hello", "hi", "good morning", "good afternoon", "good evening", "welcome"
-}
-
-# Command prefix words
-_COMMAND_WORDS: Set[str] = {
-    "please", "kindly", "finish", "do", "tell", "send", "check", "make", "let's", "lets"
-}
-
-
-def _is_question(text: str) -> bool:
-    clean = text.strip().lower()
-    if clean.endswith("?"):
-        return True
-    words = clean.split()
-    if words and words[0].rstrip(",.!") in _QUESTION_WORDS:
-        return True
-    return False
-
-
-def _is_command(text: str) -> bool:
-    clean = text.strip().lower()
-    words = clean.split()
-    if words and words[0].rstrip(",.!") in _COMMAND_WORDS:
-        return True
-    return False
-
-
-def _is_acknowledgement(text: str) -> bool:
-    clean = re.sub(r"[^\w\s]", "", text.strip().lower())
-    if clean in _ACKNOWLEDGEMENTS:
-        return True
-    words = clean.split()
-    return len(words) <= 3 and clean in _ACKNOWLEDGEMENTS
-
-
-def _extract_first_name(display_name: str) -> str:
-    """Extract clean first name for vocative detection."""
-    clean = re.sub(r"[^\w\s]", "", display_name.strip())
-    parts = clean.split()
-    return parts[0].strip() if parts else display_name.strip()
-
-
-def _detect_vocative_targets(text: str, participants: List[MeetingParticipant]) -> Set[str]:
-    clean_text = text.lower()
-    targeted_pids: Set[str] = set()
-
-    for p in participants:
-        first_name = _extract_first_name(p.display_name).lower()
-        if len(first_name) < 2:
-            continue
-
-        pattern = r"\b(" + "|".join(_GREETING_WORDS) + r")?\s*" + re.escape(first_name) + r"[\s,\.!\?]|\b" + re.escape(first_name) + r"[\s,\.!\?]"
-        if re.search(pattern, clean_text):
-            targeted_pids.add(p.participant_id)
-
-    return targeted_pids
+# Minimum score advantage required to switch active speakers (prevents numerical noise oscillation)
+_SWITCH_HYSTERESIS_MARGIN = 1.5
 
 
 def _build_presence_intervals(
@@ -172,7 +99,20 @@ def _build_presence_intervals(
 
 
 class DynamicAttributionEngine:
-    """O(n) Deterministic per-turn speaker attribution engine with observability."""
+    """Phase 2.6 Conversation State Attribution Engine."""
+
+    def __init__(self):
+        self.providers: List[EvidenceProvider] = [
+            PresenceEvidenceProvider(),
+            VocativeEvidenceProvider(),
+            TemporalContinuityProvider(),
+            ConversationalTransitionProvider(),
+            OwnershipProvider(),
+            AlternationProvider(),
+            InterruptionProvider(),
+            SegmentationProvider(),
+            DeepgramPriorProvider(),
+        ]
 
     def attribute(
         self,
@@ -187,13 +127,13 @@ class DynamicAttributionEngine:
         now_iso = datetime.now(timezone.utc).isoformat()
 
         if not participants:
-            log.warning("attribution.dynamic_engine.empty_roster")
+            log.warning("attribution.state_engine.empty_roster")
             resolved = [
                 ParticipantAttributedSegment(
                     segment_id=seg.segment_id,
                     raw_segment_id=seg.raw_segment_id,
                     source_stage="resolution",
-                    processing_history=[*seg.processing_history, "dynamic_attribution"],
+                    processing_history=[*seg.processing_history, "conversation_state_attribution"],
                     start_time=seg.start_time,
                     end_time=seg.end_time,
                     text=seg.text,
@@ -225,10 +165,8 @@ class DynamicAttributionEngine:
             )
             return resolved, debug_art, timeline_art
 
-        # Build presence intervals
         presence_intervals = _build_presence_intervals(participants, presence_timeline)
 
-        # Build fast lookup for Deepgram static mapping prior (if present)
         static_map: Dict[str, Tuple[str, str, float]] = {}
         if mapping:
             for entry in mapping.entries:
@@ -239,14 +177,16 @@ class DynamicAttributionEngine:
                         entry.mapping_confidence,
                     )
 
-        # Build participant fast map
         p_by_id: Dict[str, MeetingParticipant] = {p.participant_id: p for p in participants}
+
+        unique_speakers = {s.speaker_label for s in attributed_segments if s.speaker_label}
+        has_multiple_speakers = len(unique_speakers) > 1
 
         resolved_segments: List[ParticipantAttributedSegment] = []
         decisions: List[AttributionDecision] = []
         timeline_items: List[AttributionTimelineItem] = []
 
-        # Decision category counts for statistics
+        # Tally counts for AttributionStatistics
         fallback_count = 0
         deepgram_count = 0
         dialogue_count = 0
@@ -257,247 +197,76 @@ class DynamicAttributionEngine:
         total_confidence = 0.0
         total_gap = 0.0
 
-        prev_participant_id: Optional[str] = None
-        prev_text: Optional[str] = None
-        prev_vocative_targets: Set[str] = set()
-        consecutive_turns: int = 0
+        # Initialize ConversationState
+        state = ConversationState()
 
         for idx, seg in enumerate(attributed_segments):
-            seg_dur = seg.end_time - seg.start_time
-            candidate_switch = seg.metadata.get("candidate_speaker_switch", False)
-            vocative_targets = _detect_vocative_targets(seg.text, participants)
-
             candidate_scores_list: List[CandidateScores] = []
-            reasons: Dict[str, str] = {}
 
             for p in participants:
                 pid = p.participant_id
-                primary_reason = "fallback_join_order"
+                p_window = presence_intervals.get(pid, (0.0, float("inf")))
+
+                scores_by_provider: Dict[str, float] = {}
                 rule_traces: List[RuleTrace] = []
+                total_cand_score = 0.0
 
-                # Component scores
-                presence_score = 0.0
-                join_window_score = 0.0
-                vocative_score = 0.0
-                qa_score = 0.0
-                dialogue_score = 0.0
-                ack_score = 0.0
-                continuity_score = 0.0
-                deepgram_prior_score = 0.0
+                for prov in self.providers:
+                    sc, trace = prov.evaluate(
+                        segment=seg,
+                        participant=p,
+                        state=state,
+                        presence_window=p_window,
+                        static_map=static_map,
+                        all_participants=participants,
+                    )
+                    scores_by_provider[prov.provider_name] = sc
+                    rule_traces.append(trace)
 
-                # -----------------------------------------------------------
-                # Signal 1: Presence Window Check (Hard Filter)
-                # -----------------------------------------------------------
-                join_sec, leave_sec = presence_intervals.get(pid, (0.0, float("inf")))
-                if seg.start_time < (join_sec - 2.0) or seg.end_time > (leave_sec + 2.0):
-                    presence_score = -999.0
-                    rule_traces.append(RuleTrace(
-                        rule_name="PresenceWindow",
-                        status="FAIL",
-                        contribution=-999.0,
-                        details=f"Outside presence window [{join_sec:.1f}s, {leave_sec:.1f}s]"
-                    ))
-                else:
-                    presence_score = 1.0
-                    rule_traces.append(RuleTrace(
-                        rule_name="PresenceWindow",
-                        status="PASS",
-                        contribution=1.0,
-                        details=f"Inside presence window [{join_sec:.1f}s, {leave_sec:.1f}s]"
-                    ))
-
-                # If disqualified by presence window, skip further positive scoring
-                if presence_score < 0.0:
-                    fallback_score = round((100 - p.join_order) * 0.01, 2)
-                    final_score = -999.0
-                    reasons[pid] = "absent_during_timestamp"
-                    candidate_scores_list.append(CandidateScores(
-                        participant_id=pid,
-                        participant_name=p.display_name,
-                        presence_score=presence_score,
-                        join_window_score=join_window_score,
-                        dialogue_alternation_score=0.0,
-                        temporal_continuity_score=0.0,
-                        vocative_score=0.0,
-                        question_answer_score=0.0,
-                        acknowledgement_score=0.0,
-                        deepgram_prior_score=0.0,
-                        fallback_score=fallback_score,
-                        final_score=final_score,
-                        rule_traces=rule_traces,
-                    ))
-                    continue
-
-                # -----------------------------------------------------------
-                # Signal 2: Vocative Detection & Addressee Priming
-                # -----------------------------------------------------------
-                if vocative_targets:
-                    if pid in vocative_targets:
-                        vocative_score -= 25.0
-                        rule_traces.append(RuleTrace(
-                            rule_name="Vocative",
-                            status="FAIL",
-                            contribution=-25.0,
-                            details="Addressee target in text"
-                        ))
+                    if prov.provider_name == "PresenceWindow" and sc < 0.0:
+                        total_cand_score = -999.0
+                        break
                     else:
-                        vocative_score += 15.0
-                        primary_reason = "vocative_detection"
-                        rule_traces.append(RuleTrace(
-                            rule_name="Vocative",
-                            status="PASS",
-                            contribution=15.0,
-                            details="Active participant during vocative"
-                        ))
+                        total_cand_score += sc
 
-                if prev_vocative_targets and pid in prev_vocative_targets:
-                    vocative_score += 20.0
-                    if primary_reason == "fallback_join_order":
-                        primary_reason = "vocative_detection"
-                    rule_traces.append(RuleTrace(
-                        rule_name="AddresseePriming",
-                        status="PASS",
-                        contribution=20.0,
-                        details="Addressed in previous turn"
-                    ))
-
-                # -----------------------------------------------------------
-                # Signal 3: Weighted Q&A & Dialogue Alternation
-                # -----------------------------------------------------------
-                if prev_text:
-                    if _is_question(prev_text):
-                        if pid != prev_participant_id:
-                            qa_score += 15.0
-                            if primary_reason == "fallback_join_order":
-                                primary_reason = "dialogue_alternation"
-                            rule_traces.append(RuleTrace(
-                                rule_name="QuestionAnswer",
-                                status="PASS",
-                                contribution=15.0,
-                                details="Answer to previous question"
-                            ))
-                        else:
-                            rule_traces.append(RuleTrace(
-                                rule_name="QuestionAnswer",
-                                status="FAIL",
-                                contribution=0.0,
-                                details="Same speaker after question"
-                            ))
-                    elif _is_acknowledgement(prev_text):
-                        if pid != prev_participant_id and (candidate_switch or _is_command(seg.text)):
-                            dialogue_score += 15.0
-                            if primary_reason == "fallback_join_order":
-                                primary_reason = "dialogue_alternation"
-                            rule_traces.append(RuleTrace(
-                                rule_name="DialogueAlternation",
-                                status="PASS",
-                                contribution=15.0,
-                                details="Switch after acknowledgement"
-                            ))
-
-                # -----------------------------------------------------------
-                # Signal 4: Weighted Short Acknowledgements
-                # -----------------------------------------------------------
-                if _is_acknowledgement(seg.text):
-                    if prev_participant_id and pid != prev_participant_id:
-                        ack_boost = 12.0
-                        if candidate_switch:
-                            ack_boost += 5.0
-                        if prev_text and _is_question(prev_text):
-                            ack_boost += 5.0
-                        ack_score += ack_boost
-                        if primary_reason == "fallback_join_order":
-                            primary_reason = "acknowledgement"
-                        rule_traces.append(RuleTrace(
-                            rule_name="Acknowledgement",
-                            status="PASS",
-                            contribution=ack_boost,
-                            details="Short acknowledgement by opposite participant"
-                        ))
-
-                # -----------------------------------------------------------
-                # Signal 5 & 6: Consecutive Turn & Temporal Continuity
-                # -----------------------------------------------------------
-                if prev_participant_id and pid == prev_participant_id:
-                    cont_boost = 10.0
-                    if candidate_switch:
-                        cont_boost = 2.0
-                    if consecutive_turns > 5 and candidate_switch:
-                        cont_boost -= 6.0
-                    elif consecutive_turns > 15:
-                        cont_boost -= 12.0
-                    continuity_score += cont_boost
-                    if primary_reason == "fallback_join_order":
-                        primary_reason = "temporal_continuity"
-                    rule_traces.append(RuleTrace(
-                        rule_name="TemporalContinuity",
-                        status="PASS",
-                        contribution=cont_boost,
-                        details=f"Consecutive turns: {consecutive_turns}"
-                    ))
-                else:
-                    rule_traces.append(RuleTrace(
-                        rule_name="TemporalContinuity",
-                        status="FAIL",
-                        contribution=0.0,
-                        details="Speaker switch"
-                    ))
-
-                # -----------------------------------------------------------
-                # Signal 7: Deepgram Speaker Label Prior (Weak Prior)
-                # -----------------------------------------------------------
-                if seg.speaker_label and seg.speaker_label in static_map:
-                    mapped_pid, _, map_conf = static_map[seg.speaker_label]
-                    if pid == mapped_pid:
-                        deepgram_prior_score += 4.0
-                        if primary_reason == "fallback_join_order":
-                            primary_reason = "deepgram_prior"
-                        rule_traces.append(RuleTrace(
-                            rule_name="DeepgramPrior",
-                            status="PASS",
-                            contribution=4.0,
-                            details=f"Matched Deepgram label {seg.speaker_label}"
-                        ))
-
-                # -----------------------------------------------------------
-                # Signal 8: Join-Order Baseline Fallback
-                # -----------------------------------------------------------
                 fallback_score = round((100 - p.join_order) * 0.01, 2)
-                rule_traces.append(RuleTrace(
-                    rule_name="FallbackJoinOrder",
-                    status="PASS",
-                    contribution=fallback_score,
-                    details=f"Join order {p.join_order}"
-                ))
+                if total_cand_score >= 0.0:
+                    total_cand_score += fallback_score
+                    rule_traces.append(RuleTrace.model_construct(
+                        rule_name="FallbackJoinOrder",
+                        status="PASS",
+                        contribution=fallback_score,
+                        details=f"Join order {p.join_order}"
+                    ))
 
-                final_score = round(
-                    presence_score + join_window_score + vocative_score + qa_score
-                    + dialogue_score + ack_score + continuity_score + deepgram_prior_score + fallback_score,
-                    2
-                )
-                reasons[pid] = primary_reason
+                total_cand_score = round(total_cand_score, 2)
 
-                candidate_scores_list.append(CandidateScores(
+                candidate_scores_list.append(CandidateScores.model_construct(
                     participant_id=pid,
                     participant_name=p.display_name,
-                    presence_score=presence_score,
-                    join_window_score=join_window_score,
-                    dialogue_alternation_score=dialogue_score,
-                    temporal_continuity_score=continuity_score,
-                    vocative_score=vocative_score,
-                    question_answer_score=qa_score,
-                    acknowledgement_score=ack_score,
-                    deepgram_prior_score=deepgram_prior_score,
+                    presence_score=scores_by_provider.get("PresenceWindow", 0.0),
+                    join_window_score=0.0,
+                    dialogue_alternation_score=scores_by_provider.get("ConversationalTransition", 0.0) + scores_by_provider.get("Alternation", 0.0),
+                    temporal_continuity_score=scores_by_provider.get("TemporalContinuity", 0.0),
+                    vocative_score=scores_by_provider.get("Vocative", 0.0),
+                    question_answer_score=0.0,
+                    acknowledgement_score=0.0,
+                    deepgram_prior_score=scores_by_provider.get("DeepgramPrior", 0.0),
                     fallback_score=fallback_score,
-                    final_score=final_score,
+                    final_score=total_cand_score,
                     rule_traces=rule_traces,
                 ))
 
-            # Pick highest scoring candidate
+            # Sort candidates by score
             sorted_candidates = sorted(candidate_scores_list, key=lambda c: c.final_score, reverse=True)
-            winner_candidate = sorted_candidates[0]
-            max_score = winner_candidate.final_score
+            top_candidate = sorted_candidates[0]
+            max_score = top_candidate.final_score
             runner_up_score = sorted_candidates[1].final_score if len(sorted_candidates) > 1 else 0.0
+
+            # Apply Confidence Stabilizer Hysteresis
+            winner_pid: Optional[str] = None
+            winner_pname: Optional[str] = None
+            win_reason = "conversation_state"
 
             if max_score < 0.0 and seg.speaker_label and seg.speaker_label in static_map:
                 winner_pid, winner_pname, map_conf = static_map[seg.speaker_label]
@@ -511,10 +280,50 @@ class DynamicAttributionEngine:
                 calc_confidence = 0.0
                 winning_traces = []
             else:
+                # Check hysteresis threshold against currently active speaker
+                curr_active_id = state.current_active_speaker
+                curr_active_cand = next((c for c in candidate_scores_list if c.participant_id == curr_active_id), None)
+
+                if (
+                    curr_active_cand
+                    and curr_active_cand.final_score >= 0.0
+                    and top_candidate.participant_id != curr_active_id
+                    and (max_score - curr_active_cand.final_score) < _SWITCH_HYSTERESIS_MARGIN
+                ):
+                    # Maintain current active speaker due to hysteresis threshold
+                    winner_candidate = curr_active_cand
+                    win_reason = "temporal_continuity"
+                else:
+                    winner_candidate = top_candidate
+
                 winner_pid = winner_candidate.participant_id
                 winner_pname = winner_candidate.participant_name
-                win_reason = reasons[winner_pid]
                 winning_traces = winner_candidate.rule_traces
+
+                # Determine primary resolution reason from winning provider trace
+                highest_trace = max(
+                    [t for t in winning_traces if t.rule_name != "PresenceWindow" and t.rule_name != "FallbackJoinOrder"],
+                    key=lambda t: t.contribution,
+                    default=None
+                )
+                if highest_trace and highest_trace.contribution > 0:
+                    raw_r = highest_trace.rule_name.lower()
+                    if raw_r == "vocative":
+                        win_reason = "vocative_detection"
+                    elif raw_r in ("conversationaltransition", "alternation", "segmentation"):
+                        win_reason = "dialogue_alternation"
+                    elif raw_r == "temporalcontinuity":
+                        win_reason = "temporal_continuity"
+                    elif raw_r == "deepgramprior":
+                        win_reason = "deepgram_prior"
+                    elif raw_r == "interruption":
+                        win_reason = "interruption_recovery"
+                    elif raw_r == "ownership":
+                        win_reason = "ownership_momentum"
+                    else:
+                        win_reason = raw_r
+                else:
+                    win_reason = "fallback_join_order"
 
                 margin = max_score - runner_up_score
                 if margin > 10.0:
@@ -530,63 +339,74 @@ class DynamicAttributionEngine:
             total_confidence += calc_confidence
             total_gap += score_gap
 
-            # Tally statistics counts
+            # Update decision counts for statistics
             if win_reason == "fallback_join_order":
                 fallback_count += 1
             elif win_reason == "deepgram_prior":
                 deepgram_count += 1
-            elif win_reason == "dialogue_alternation":
+            elif win_reason in ("dialogue_alternation", "interruption_recovery", "ownership_momentum"):
                 dialogue_count += 1
             elif win_reason == "vocative_detection":
                 vocative_count += 1
-            elif win_reason == "acknowledgement":
-                acknowledgement_count += 1
             elif win_reason == "temporal_continuity":
                 continuity_count += 1
 
-            if prev_text and _is_question(prev_text):
+            if seg.text.strip().endswith("?"):
                 question_count += 1
 
-            # Console Diagnostics (when DEBUG_ATTRIBUTION=True)
+            # Console diagnostics when DEBUG_ATTRIBUTION=True
             if meeting_config.DEBUG_ATTRIBUTION:
-                log.info(
-                    "attribution.debug.segment",
-                    segment_id=seg.segment_id,
-                    start_time=seg.start_time,
-                    end_time=seg.end_time,
-                    text=seg.text,
-                    deepgram_label=seg.speaker_label,
-                    winner=winner_pname,
-                    reason=win_reason,
-                    gap=score_gap,
-                    confidence=calc_confidence,
-                )
                 print(f"\n--- Segment {seg.segment_id} [{seg.start_time:.1f}s - {seg.end_time:.1f}s] ---")
                 print(f"Text: \"{seg.text}\" | Deepgram Label: {seg.speaker_label}")
                 print("Candidates:")
                 for c in candidate_scores_list:
-                    print(f"  {c.participant_name} ({c.participant_id}): Presence {c.presence_score:.1f}, Continuity {c.temporal_continuity_score:.1f}, Vocative {c.vocative_score:.1f}, Q&A {c.question_answer_score:.1f}, Dialogue {c.dialogue_alternation_score:.1f}, Ack {c.acknowledgement_score:.1f}, Deepgram {c.deepgram_prior_score:.1f}, Fallback {c.fallback_score:.2f} -> Total {c.final_score:.2f}")
+                    print(f"  {c.participant_name} ({c.participant_id}): Final {c.final_score:.2f}")
                 print(f"Winner: {winner_pname} ({winner_pid}) | Reason: {win_reason} | Gap: {score_gap:.2f} | Conf: {calc_confidence:.2f}")
 
-            # Update tracking for temporal continuity
-            if winner_pid == prev_participant_id:
-                consecutive_turns += 1
-            else:
-                consecutive_turns = 1
-                prev_participant_id = winner_pid
+            # Detect vocative targets from CandidateScores list for addressee priming in next turn
+            vocative_trace = next((t for c in candidate_scores_list for t in c.rule_traces if t.rule_name == "Vocative" and t.contribution < 0), None)
+            next_responder = None
+            if vocative_trace:
+                # Target was identified as addressee with penalty
+                bad_pid = next((c.participant_id for c in candidate_scores_list for t in c.rule_traces if t == vocative_trace), None)
+                if bad_pid:
+                    next_responder = bad_pid
 
-            prev_text = seg.text
-            prev_vocative_targets = vocative_targets
+            # Check if winner represents an interruption
+            is_interruption = False
+            if state.current_active_speaker and winner_pid and winner_pid != state.current_active_speaker:
+                gap = max(0.0, seg.start_time - state.last_segment_end_time)
+                if gap < 0.5 and seg.end_time - seg.start_time < 2.0:
+                    # In diarized meetings, check if the next segment belongs to the same winner
+                    is_continuation = False
+                    if has_multiple_speakers and idx + 1 < len(attributed_segments):
+                        next_seg = attributed_segments[idx + 1]
+                        if next_seg.speaker_label and static_map:
+                            next_owner = static_map.get(next_seg.speaker_label, (None, None, 0.0))[0]
+                            if next_owner == winner_pid:
+                                is_continuation = True
+                    
+                    if not is_continuation:
+                        is_interruption = True
+
+            # Advance ConversationState
+            state = state.transition(
+                winner_pid=winner_pid,
+                start_time=seg.start_time,
+                end_time=seg.end_time,
+                is_interruption=is_interruption,
+                next_expected_responder=next_responder,
+            )
 
             meta = dict(seg.metadata)
             meta["attribution_scores"] = {c.participant_id: c.final_score for c in candidate_scores_list}
 
             resolved_segments.append(
-                ParticipantAttributedSegment(
+                ParticipantAttributedSegment.model_construct(
                     segment_id=seg.segment_id,
                     raw_segment_id=seg.raw_segment_id,
                     source_stage="resolution",
-                    processing_history=[*seg.processing_history, "dynamic_attribution"],
+                    processing_history=[*seg.processing_history, "conversation_state_attribution"],
                     start_time=seg.start_time,
                     end_time=seg.end_time,
                     text=seg.text,
@@ -603,7 +423,7 @@ class DynamicAttributionEngine:
             )
 
             decisions.append(
-                AttributionDecision(
+                AttributionDecision.model_construct(
                     segment_id=seg.segment_id,
                     deepgram_label=seg.speaker_label,
                     start_time=seg.start_time,
@@ -622,7 +442,7 @@ class DynamicAttributionEngine:
             )
 
             timeline_items.append(
-                AttributionTimelineItem(
+                AttributionTimelineItem.model_construct(
                     segment_id=seg.segment_id,
                     start_time=seg.start_time,
                     end_time=seg.end_time,
@@ -653,7 +473,7 @@ class DynamicAttributionEngine:
             average_candidate_gap=avg_gap,
         )
 
-        debug_artifact = AttributionDebugArtifact(
+        debug_artifact = AttributionDebugArtifact.model_construct(
             meeting_id=meeting_id,
             parent_speaker_attributed_transcript_id=parent_transcript_id,
             statistics=stats,
@@ -661,7 +481,7 @@ class DynamicAttributionEngine:
             created_at=now_iso,
         )
 
-        timeline_artifact = AttributionTimelineArtifact(
+        timeline_artifact = AttributionTimelineArtifact.model_construct(
             meeting_id=meeting_id,
             parent_speaker_attributed_transcript_id=parent_transcript_id,
             timeline=timeline_items,
@@ -669,7 +489,7 @@ class DynamicAttributionEngine:
         )
 
         log.info(
-            "attribution.dynamic_engine.completed",
+            "attribution.state_engine.completed",
             segment_count=total_segs,
             average_confidence=avg_conf,
             average_gap=avg_gap,

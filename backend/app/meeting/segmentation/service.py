@@ -186,47 +186,60 @@ class ConversationTurnSegmenter:
                 )
                 split_units.append(split_seg)
 
-            # Analyze dialogue alternation across split sentence units
-            for i in range(len(split_units)):
-                curr_u = split_units[i]
+            output_segments.extend(split_units)
 
-                # If i > 0, check for speaker switch pattern between i-1 and i
-                if i > 0:
-                    prev_u = split_units[i - 1]
-                    switch_detected = False
-                    reason: Optional[str] = None
+        # Check if the transcript has multiple unique speakers detected by the STT
+        unique_speakers = {s.speaker for s in output_segments if s.speaker}
+        has_multiple_speakers = len(unique_speakers) > 1
 
-                    # Rule 1: Question → Answer
-                    if _is_question(prev_u.text) and not _is_question(curr_u.text):
-                        switch_detected = True
-                        reason = "question_answer"
+        # Analyze dialogue alternation across all output segments
+        for i in range(1, len(output_segments)):
+            prev_u = output_segments[i - 1]
+            curr_u = output_segments[i]
 
-                    # Rule 2: Command / Request → Response / Acknowledgement
-                    elif _is_command(prev_u.text) and (_is_acknowledgement(curr_u.text) or len(curr_u.text.split()) <= 4):
-                        switch_detected = True
-                        reason = "acknowledgement"
+            # Do not assume speaker switches within sentence units of the same parent segment
+            if prev_u.raw_segment_id and curr_u.raw_segment_id and prev_u.raw_segment_id == curr_u.raw_segment_id:
+                continue
 
-                    # Rule 3: Acknowledgement / Short phrase alternation
-                    elif _is_acknowledgement(curr_u.text):
-                        switch_detected = True
-                        reason = "acknowledgement"
+            switch_detected = False
+            reason: Optional[str] = None
 
-                    elif len(prev_u.text) <= 25 and len(curr_u.text) <= 25:
-                        switch_detected = True
-                        reason = "alternating_short_sentence"
+            if has_multiple_speakers:
+                # If diarization is available, rely on speaker label changes
+                if prev_u.speaker and curr_u.speaker and prev_u.speaker != curr_u.speaker:
+                    switch_detected = True
+                    reason = "speaker_label_change"
+            else:
+                # Fallback to conversational heuristics if diarization is not available (e.g., mixed mono channel)
+                # Rule 1: Question → Answer
+                if _is_question(prev_u.text) and not _is_question(curr_u.text):
+                    switch_detected = True
+                    reason = "question_answer"
 
-                    if switch_detected and reason:
-                        curr_u.metadata["candidate_speaker_switch"] = True
-                        curr_u.metadata["speaker_switch_reason"] = reason
-                        candidate_switches_count += 1
-                        log.debug(
-                            "segmentation.candidate_speaker_switch",
-                            segment_id=curr_u.id,
-                            reason=reason,
-                            text=curr_u.text,
-                        )
+                # Rule 2: Command / Request → Response / Acknowledgement
+                elif _is_command(prev_u.text) and (_is_acknowledgement(curr_u.text) or len(curr_u.text.split()) <= 4):
+                    switch_detected = True
+                    reason = "acknowledgement"
 
-                output_segments.append(curr_u)
+                # Rule 3: Acknowledgement / Short phrase alternation
+                elif _is_acknowledgement(curr_u.text):
+                    switch_detected = True
+                    reason = "acknowledgement"
+
+                elif len(prev_u.text) <= 25 and len(curr_u.text) <= 25:
+                    switch_detected = True
+                    reason = "alternating_short_sentence"
+
+            if switch_detected and reason:
+                curr_u.metadata["candidate_speaker_switch"] = True
+                curr_u.metadata["speaker_switch_reason"] = reason
+                candidate_switches_count += 1
+                log.debug(
+                    "segmentation.candidate_speaker_switch",
+                    segment_id=curr_u.id,
+                    reason=reason,
+                    text=curr_u.text,
+                )
 
         duration_ms = int((time.monotonic() - t0) * 1000)
         durations_after = [s.end_time - s.start_time for s in output_segments]

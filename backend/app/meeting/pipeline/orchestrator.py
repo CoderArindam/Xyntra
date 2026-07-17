@@ -186,11 +186,12 @@ class MeetingPipelineOrchestrator:
             }
             
             # Check if we can skip (resumability)
-            can_skip = True
-            for gen_art in stage.generated_artifacts:
-                if not self.context.artifacts.exists(gen_art):
-                    can_skip = False
-                    break
+            can_skip = stage.skippable
+            if can_skip:
+                for gen_art in stage.generated_artifacts:
+                    if not self.context.artifacts.exists(gen_art):
+                        can_skip = False
+                        break
                     
             if can_skip and stage.generated_artifacts:
                 stage_info["status"] = StageStatus.SKIPPED.value

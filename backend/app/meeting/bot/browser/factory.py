@@ -24,11 +24,17 @@ _CHROMIUM_ARGS = [
     "--no-sandbox",
     "--disable-dev-shm-usage",
     "--disable-blink-features=AutomationControlled",
-    "--use-fake-ui-for-media-stream",   # auto-grants mic/camera prompts
     "--disable-infobars",
     "--disable-notifications",
     "--start-maximized",
+    "--allow-http-screen-capture",
+    "--enable-usermedia-screen-capturing",
+    "--auto-select-desktop-capture-source=Meet",
+    "--auto-select-tab-capture-source-by-title=Meet",
+    "--auto-select-desktop-capture-source=Google Meet",
+    "--auto-select-tab-capture-source-by-title=Google Meet",
 ]
+
 
 _IGNORE_ARGS = [
     "--enable-automation",
@@ -217,12 +223,34 @@ class BrowserFactory:
                 extension_loaded = True
                 log.info("Extension Loaded and Verified Successfully")
                 
+            browser_version = "unknown"
+            if hasattr(context, "browser") and context.browser:
+                try:
+                    browser_version = context.browser.version
+                except Exception:
+                    pass
+
+            launch_audit = {
+                "chromium_version": browser_version,
+                "launch_arguments": args,
+                "ignore_default_args": _IGNORE_ARGS,
+                "permissions": ["camera", "microphone"],
+                "viewport": {"width": 1280, "height": 800},
+                "headless": headless,
+                "extension_loaded": extension_loaded,
+                "selected_media_flags": [
+                    arg for arg in args if any(m in arg for m in ["media", "capture", "fake", "camera", "microphone", "desktop"])
+                ],
+            }
+
             return BrowserSession(
                 playwright=playwright_instance,
                 context=context,
                 profile_path=Path(profile_dir),
                 extension_loaded=extension_loaded,
+                browser_launch_audit=launch_audit,
             )
+
             
         except Exception as exc:
             log.error("Browser launch failed", error=str(exc))
