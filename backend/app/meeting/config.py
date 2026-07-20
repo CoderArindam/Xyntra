@@ -75,9 +75,6 @@ class MeetingSettings(BaseSettings):
     # ------------------------------------------------------------------ #
     SPEECH_PROVIDER: str = "deepgram"       # active speech engine
     INTELLIGENCE_PROVIDER: str = "gemini"
-    TRANSLATION_PROVIDER: str = ""
-    EMBEDDING_PROVIDER: str = ""
-    PIPELINE_CHUNK_DURATION_SEC: int = 30
     PIPELINE_MAX_RETRIES: int = 3
     ARTIFACT_RETENTION_DAYS: int = 30
 

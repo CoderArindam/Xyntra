@@ -1,1 +1,0 @@
-# Future Intelligence Provider Implementations

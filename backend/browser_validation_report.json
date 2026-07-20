@@ -1,6 +1,0 @@
-{
-  "Verification Timestamp": "2026-07-17T12:42:45.030035Z",
-  "Browser Profile Path": "storage/meeting/profile",
-  "Overall Status": "FAILED",
-  "Error": "Backend did not receive the fake event within timeout."
-}

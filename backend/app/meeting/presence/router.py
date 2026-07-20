@@ -183,34 +183,3 @@ def get_or_create_provider(session_id: str):
         provider.recorder = EventRecorder(Path(meeting_config.RECORDING_OUTPUT_DIR), session_id)
     return provider
 
-@router.get("/debug/status")
-async def debug_status(token: str = Depends(verify_api_key)):
-    from app.meeting.providers.participant_presence.registry import presence_registry
-    
-    if not presence_registry._providers:
-        return {
-            "extension_connected": False,
-            "last_heartbeat": None,
-            "content_script_connected": False,
-            "active_tabs": 0,
-            "event_queue_size": 0,
-            "pending_events": [],
-            "last_event_received": None
-        }
-        
-    provider = list(presence_registry._providers.values())[-1] # Grab most recent for debug
-    
-    if not isinstance(provider, RealtimePresenceProvider):
-        return {"status": "inactive", "message": "External provider not configured"}
-    
-    last_hb = provider.last_heartbeat_at.isoformat() + "Z" if provider.last_heartbeat_at else None
-    
-    return {
-        "extension_connected": provider.last_heartbeat_at is not None,
-        "last_heartbeat": last_hb,
-        "content_script_connected": getattr(provider, "content_script_connected", False),
-        "active_tabs": getattr(provider, "active_tabs", 0),
-        "event_queue_size": len(provider._events),
-        "pending_events": [e.model_dump() for e in provider._events],
-        "last_event_received": provider._events[-1].model_dump() if provider._events else None
-    }

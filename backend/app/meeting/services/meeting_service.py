@@ -96,10 +96,7 @@ class MeetingRuntime:
     
     def request_shutdown(self, reason: str) -> None:
         """Signal the join flow owner to begin teardown."""
-        import inspect
-        caller = inspect.currentframe().f_back
-        caller_name = f"{caller.f_globals.get('__name__', 'unknown')}:{caller.f_code.co_name}" if caller else "unknown"
-        log.info("cleanup_requested.set", reason=reason, caller=caller_name)
+        log.info("cleanup_requested.set", reason=reason)
         if self.state in (RuntimeState.CLEANING_UP, RuntimeState.CLOSED):
             return
         self.shutdown_reason = reason
@@ -467,10 +464,7 @@ class MeetingService:
         log.info("cleanup.signal_shutdown.start", session_id=runtime.session_id)
         runtime.state = RuntimeState.CLEANING_UP
         runtime.shutdown_reason = runtime.shutdown_reason or "cleanup"
-        import inspect
-        caller = inspect.currentframe().f_back
-        caller_name = f"{caller.f_globals.get('__name__', 'unknown')}:{caller.f_code.co_name}" if caller else "unknown"
-        log.info("cleanup_requested.set", reason=runtime.shutdown_reason, caller=caller_name)
+        log.info("cleanup_requested.set", reason=runtime.shutdown_reason)
         runtime._cleanup_event.set()
         session = self._session_manager.get(runtime.session_id)
         if session and session.status not in TERMINAL_STATUSES:
@@ -933,10 +927,6 @@ class MeetingService:
         finally:
             current_task = asyncio.current_task()
             stored = runtime.background_tasks.get("empty_timer")
-            log.info(f"finally block: current={current_task}, stored={stored}")
             if stored == current_task:
-                log.info("matched! popping.")
                 runtime.background_tasks.pop("empty_timer", None)
-            else:
-                log.info("didn't match.")
 

@@ -23,12 +23,6 @@ class MeetingRecording(MeetingArtifact):
     recording_status: str           # "completed", "partial", "failed"
 
 
-class AudioSegment(MeetingArtifact):
-    """A sliced segment of the raw audio for processing."""
-    start_time: float
-    end_time: float
-    file_path: str
-
 
 class ProcessedAudio(MeetingArtifact):
     """Validated, normalized audio ready for downstream STT/diarization."""
