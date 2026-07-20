@@ -131,7 +131,13 @@ class MeetingService:
     # Public API                                                           #
     # ------------------------------------------------------------------ #
 
-    async def join_meeting(self, meeting_url: str) -> MeetingSession:
+    async def join_meeting(
+        self,
+        meeting_url: str,
+        session_id: str | None = None,
+        org_id: int = 1,
+        metadata: dict | None = None
+    ) -> MeetingSession:
         """Create a session and fire the join flow asynchronously."""
         profile_path = self._profile_manager.get_profile_path()
         profile_name = profile_path.name
@@ -160,7 +166,12 @@ class MeetingService:
             if existing_rt.profile_path == profile_path and existing_rt.state != RuntimeState.CLOSED:
                 raise RuntimeError("Session is already running or shutting down.")
 
-        session = self._session_manager.create(meeting_url)
+        session = self._session_manager.create(
+            meeting_url,
+            session_id=session_id,
+            org_id=org_id,
+            metadata=metadata
+        )
 
         task = asyncio.create_task(
             self._run_join_flow(session.session_id, meeting_url),
@@ -626,8 +637,9 @@ class MeetingService:
         if session and session.recording_artifact_id:
             try:
                 from app.meeting.pipeline.orchestrator import MeetingPipelineOrchestrator
-                log.info("pipeline.starting", session_id=runtime.session_id)
-                orchestrator = MeetingPipelineOrchestrator(meeting_id=runtime.session_id)
+                log.info("pipeline.starting", session_id=runtime.session_id, org_id=getattr(session, "org_id", 1))
+                pipeline_meta = {"org_id": getattr(session, "org_id", 1), **(getattr(session, "metadata", {}) or {})}
+                orchestrator = MeetingPipelineOrchestrator(meeting_id=runtime.session_id, metadata=pipeline_meta)
                 asyncio.create_task(orchestrator.execute_pipeline(), name=f"pipeline-{runtime.session_id[:8]}")
             except Exception as exc:
                 log.error("pipeline.start_failed", session_id=runtime.session_id, error=str(exc))

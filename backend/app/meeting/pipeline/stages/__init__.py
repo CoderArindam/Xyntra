@@ -9,6 +9,7 @@ from .presence import PresenceCollectionStage
 from .roster import ParticipantRosterStage
 from .mapping import SpeakerMappingStage
 from .resolution import ParticipantResolutionStage
+from .extraction import TaskExtractionStage
 
 # Default order of execution.
 # Can also be constructed dynamically by sorting on stage.execution_order
@@ -22,4 +23,5 @@ ALL_STAGES = [
     ParticipantRosterStage(),         # order 700 — roster building
     SpeakerMappingStage(),            # order 800 — speaker → participant mapping
     ParticipantResolutionStage(),     # order 900 — final attribution
+    TaskExtractionStage(),            # order 1000 — LLM task proposal extraction
 ]

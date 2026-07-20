@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Any
 from .base import MeetingArtifact
 
 
@@ -17,12 +17,23 @@ class ActionItem(MeetingArtifact):
 
 class ExtractedTask(MeetingArtifact):
     """A well-formed task extracted by AI intended for Kanban mapping."""
+    meeting_id: str = ""
     title: str
-    description: str
+    description: str = ""
     assignee: Optional[str] = None
+    suggested_assignee_id: Optional[int] = None
     due_date: Optional[str] = None
     priority: str = "medium"
     tags: List[str] = []
+    confidence_score: float = 0.8
+    source_transcript_quote: Optional[str] = None
+    suggested_speaker_label: Optional[str] = None
+    suggested_board_name: Optional[str] = None
+    suggested_board_id: Optional[int] = None
+    board_confidence: Optional[float] = None
+    board_source: Optional[str] = None
+    raw_llm_payload: Optional[Any] = None
+
 
 
 class TaskProposal(MeetingArtifact):

@@ -8,7 +8,7 @@ import Signup from '../features/auth/Signup';
 import LandingPage from '../features/auth/LandingPage';
 import AcceptInvitation from '../features/auth/AcceptInvitation';
 
-import DashboardPage from '../features/dashboard/DashboardPage';
+import DashboardView from '../features/dashboard/DashboardView';
 import BoardPage from '../features/boards/BoardPage';
 import MyWorkPage from '../features/my-work/MyWorkPage';
 
@@ -40,6 +40,9 @@ import {
   Puzzle,
 } from 'lucide-react';
 
+import RequireRole from '../routes/RequireRole';
+import ProposalQueueView from '../features/proposals/components/ProposalQueueView';
+
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
@@ -50,9 +53,17 @@ export const AppRoutes: React.FC = () => {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/dashboard" element={<DashboardView />} />
           <Route path="/my-work" element={<MyWorkPage />} />
           <Route path="/board/:id" element={<BoardPage />} />
+
+
+          {/* Role-gated proposal review queue routes */}
+          <Route element={<RequireRole allowedRoles={['SUPER_ADMIN', 'MANAGER']} />}>
+            <Route path="/meetings/:sessionId/proposals" element={<ProposalQueueView />} />
+            <Route path="/meeting/:sessionId/proposals" element={<ProposalQueueView />} />
+          </Route>
+
           <Route
             path="/board/:boardId/settings"
             element={<ProjectSettingsLayout />}

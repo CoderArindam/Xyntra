@@ -26,7 +26,7 @@ log = get_logger("pipeline.orchestrator")
 class MeetingPipelineOrchestrator:
     """End-to-End Orchestrator for Meeting Intelligence."""
 
-    def __init__(self, meeting_id: str):
+    def __init__(self, meeting_id: str, metadata: Dict[str, Any] = None):
         self.meeting_id = meeting_id
         
         # Determine base directory for this meeting session
@@ -35,10 +35,12 @@ class MeetingPipelineOrchestrator:
         if not self.session_dir.exists():
             self.session_dir.mkdir(parents=True, exist_ok=True)
             
+        meta = metadata or {}
         self.context = PipelineContext(
             meeting_id=meeting_id,
             session_directory=self.session_dir,
-            artifacts=ArtifactRegistry(self.session_dir)
+            artifacts=ArtifactRegistry(self.session_dir),
+            metadata=meta
         )
         
         # Sort stages by explicit execution order

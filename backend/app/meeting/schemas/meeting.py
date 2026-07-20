@@ -20,6 +20,8 @@ from pydantic import BaseModel
 
 class JoinRequest(BaseModel):
     meeting_url: str
+    board_id: int | None = None
+
 
 
 # ------------------------------------------------------------------ #
@@ -111,6 +113,10 @@ class SessionResponse(BaseModel):
     speaker_timeline: list[dict[str, Any]] = []
     intelligence_alive: bool = False
     observer_health: dict[str, Any] = {}
+    # ── M3 proposals fields ──
+    proposals_ready: bool = False
+    proposals_count: int = 0
+
 
 
 # ------------------------------------------------------------------ #

@@ -77,6 +77,10 @@ class MeetingSettings(BaseSettings):
     INTELLIGENCE_PROVIDER: str = "gemini"
     PIPELINE_MAX_RETRIES: int = 3
     ARTIFACT_RETENTION_DAYS: int = 30
+    EXTRACTION_MAX_RETRIES: int = 3
+    EXTRACTION_CHUNK_TOKEN_LIMIT: int = 4000
+    EXTRACTION_MIN_TRANSCRIPT_WORDS: int = 20
+
 
     # ------------------------------------------------------------------ #
     # Recording                                                            #

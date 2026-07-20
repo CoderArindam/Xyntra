@@ -83,6 +83,7 @@ class PipelineContext(BaseModel):
     processing_version: str = "1.0.0"
     
     artifacts: ArtifactRegistry = Field(exclude=True)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     
     # Execution state
     started_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")

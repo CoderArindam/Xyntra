@@ -66,17 +66,30 @@ class MeetingSessionManager:
     # CRUD                                                                 #
     # ------------------------------------------------------------------ #
 
-    def create(self, meeting_url: str) -> MeetingSession:
+    def create(
+        self,
+        meeting_url: str,
+        session_id: str | None = None,
+        org_id: int = 1,
+        metadata: dict | None = None
+    ) -> MeetingSession:
         active = [s for s in self._sessions.values() if s.status in ACTIVE_STATUSES]
         if len(active) >= meeting_config.MAX_CONCURRENT_SESSIONS:
             raise RuntimeError(
                 f"Max concurrent sessions ({meeting_config.MAX_CONCURRENT_SESSIONS}) reached. "
                 "Leave an existing session before starting a new one."
             )
-        session = MeetingSession(meeting_url=meeting_url)
+
+        kwargs: dict[str, Any] = {"meeting_url": meeting_url, "org_id": org_id}
+        if session_id:
+            kwargs["session_id"] = session_id
+        if metadata:
+            kwargs["metadata"] = metadata
+
+        session = MeetingSession(**kwargs)
         self._sessions[session.session_id] = session
         self._resources[session.session_id] = _SessionResources()
-        log.info("Session created", session_id=session.session_id, url=meeting_url)
+        log.info("Session created", session_id=session.session_id, url=meeting_url, org_id=org_id)
         return session
 
     def get(self, session_id: str) -> MeetingSession | None:

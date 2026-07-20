@@ -8,6 +8,7 @@ import WorkspaceLoader from '../common/WorkspaceLoader';
 import { updateFavicon } from '../../utils/favicon';
 
 import ApplicationSidebar from './ApplicationSidebar';
+import { ActiveMeetingBar } from '../../features/meeting/components/ActiveMeetingBar';
 import { AIButton } from '../../features/ai/components/AIButton';
 import { AIPanel } from '../../features/ai/components/AIPanel';
 import CreateProjectModal from '../../features/projects/components/CreateProjectModal';
@@ -44,6 +45,7 @@ export const AppLayout: React.FC = () => {
     <div className="flex h-screen overflow-hidden bg-brand-bg text-brand-text">
       <ApplicationSidebar />
       <div className="flex-1 flex flex-col relative overflow-hidden min-w-0 md:pt-0 pt-16">
+        <ActiveMeetingBar />
         <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>

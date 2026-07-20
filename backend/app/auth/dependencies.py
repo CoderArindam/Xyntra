@@ -53,3 +53,63 @@ async def get_current_user(
         "organization_id": organization_id,
         "session_id": session_id,
     }
+
+
+async def require_proposal_review_access(
+    current_user: dict = Depends(get_current_user),
+    conn: asyncpg.Connection = Depends(get_db_connection)
+) -> dict:
+    """Verifies that the current user has proposal review permissions (Superadmin/Manager in org)."""
+    user_id = current_user.get("id")
+    org_id = current_user.get("organization_id")
+
+    if not user_id or not org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User or organization context missing"
+        )
+
+    has_access = await conn.fetchval(
+        "SELECT fn_check_proposal_review_access($1::integer, $2::integer)",
+        int(user_id),
+        int(org_id)
+    )
+
+    if not has_access:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Proposal review access denied. Superadmin or Manager role required."
+        )
+
+    return current_user
+
+
+async def require_meeting_initiation_access(
+    current_user: dict = Depends(get_current_user),
+    conn: asyncpg.Connection = Depends(get_db_connection)
+) -> dict:
+    """Verifies that the current user has meeting initiation permissions (Superadmin/Manager in org)."""
+    user_id = current_user.get("id")
+    org_id = current_user.get("organization_id")
+
+    if not user_id or not org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User or organization context missing"
+        )
+
+    has_access = await conn.fetchval(
+        "SELECT fn_check_meeting_initiation_access($1::integer, $2::integer)",
+        int(user_id),
+        int(org_id)
+    )
+
+    if not has_access:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Meeting initiation access denied. Superadmin or Manager role required."
+        )
+
+    return current_user
+
+

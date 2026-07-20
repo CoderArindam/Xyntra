@@ -98,6 +98,8 @@ class MeetingSession:
 
     meeting_url: str
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    org_id: int = 1
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # Lifecycle
     status: SessionStatus = SessionStatus.STARTING

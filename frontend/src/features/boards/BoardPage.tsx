@@ -7,6 +7,8 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { ProjectIdentity } from '../../components/common/ProjectIdentity';
 import EmptyState from '../../components/common/EmptyState';
 
+import BoardProposalsBadge from '../proposals/components/BoardProposalsBadge';
+
 export const Board: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { boards, fetchBoards } = useBoardStore();
@@ -58,8 +60,9 @@ export const Board: React.FC = () => {
           )}
         </div>
         
-        {/* Settings Button */}
+        {/* Settings & Proposal Badge Actions */}
         <div className="flex items-center gap-3 shrink-0">
+          {boardId > 0 && <BoardProposalsBadge boardId={boardId} />}
           <Link
             to={`/board/${boardId}/settings`}
             className="px-4 py-2 bg-brand-surface-low border border-brand-border hover:bg-brand-surface-hover rounded-md text-sm font-medium text-brand-text flex items-center gap-2 transition-colors"
