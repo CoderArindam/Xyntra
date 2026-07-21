@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import List, Optional
 import asyncpg
@@ -39,7 +40,33 @@ class UserService:
             logger.error(f"Error updating user: {e}")
             raise HTTPException(status_code=500, detail="Failed to update profile")
 
-    async def change_password(self, payload: ChangePassword, current_user: dict, ip_address: str):
+    def parse_user_agent(self, ua_string: str) -> tuple[str, str, str]:
+        ua = ua_string.lower()
+        browser = "Unknown"
+        if "chrome" in ua and "edg" not in ua:
+            browser = "Chrome"
+        elif "safari" in ua and "chrome" not in ua:
+            browser = "Safari"
+        elif "firefox" in ua:
+            browser = "Firefox"
+        elif "edg" in ua:
+            browser = "Edge"
+        
+        platform = "Unknown"
+        if "windows" in ua:
+            platform = "Windows"
+        elif "mac" in ua:
+            platform = "macOS"
+        elif "linux" in ua:
+            platform = "Linux"
+        elif "android" in ua:
+            platform = "Android"
+        elif "iphone" in ua or "ipad" in ua:
+            platform = "iOS"
+            
+        return browser, platform, f"{browser} on {platform}"
+
+    async def change_password(self, payload: ChangePassword, current_user: dict, ip_address: str, ua_string: str = "Unknown"):
         try:
             hashed_password = await self.conn.fetchval("SELECT password_hash FROM users WHERE id = $1", current_user["id"])
             
@@ -49,12 +76,16 @@ class UserService:
             new_hash = get_password_hash(payload.new_password)
             await self.conn.execute("UPDATE users SET password_hash = $1 WHERE id = $2", new_hash, current_user["id"])
             
+            browser, platform, _ = self.parse_user_agent(ua_string)
             await self.conn.execute(
-                """
-                INSERT INTO audit_logs (organization_id, user_id, action, entity_type, entity_id, ip_address)
-                VALUES ($1, $2, $3, $4, $5, $6)
-                """,
-                current_user.get("organization_id"), current_user["id"], "PASSWORD_CHANGED", "USER", current_user["id"], ip_address
+                "SELECT fn_log_security_event($1, $2, $3, $4::entity_type_enum, $5, $6, $7::jsonb)",
+                current_user.get("organization_id"),
+                current_user["id"],
+                "PASSWORD_CHANGED",
+                "USER",
+                current_user["id"],
+                ip_address,
+                json.dumps({"browser": browser, "platform": platform, "status": "Success"})
             )
         except HTTPException:
             raise

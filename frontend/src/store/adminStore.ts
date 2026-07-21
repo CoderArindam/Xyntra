@@ -91,8 +91,23 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       set((state) => ({ invitations: [newInvitation, ...state.invitations] }));
       toast.success('User invited successfully');
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to invite user');
-      throw error;
+      const detail = error.response?.data?.detail;
+      const status = error.response?.status;
+      const errorCode = typeof detail === 'object' ? detail?.error_code : null;
+      const message = typeof detail === 'object' ? detail?.message : (typeof detail === 'string' ? detail : error.message);
+
+      if (status === 409 || errorCode === 'USER_ALREADY_EXISTS' || message?.includes('already part of the organization') || message?.includes('already a registered user')) {
+        const errorMsg = 'This person is already part of the organization';
+        toast.error(errorMsg);
+        throw new Error(errorMsg);
+      } else if (typeof message === 'string' && message) {
+        toast.error(message);
+        throw new Error(message);
+      } else {
+        const fallbackMsg = 'Failed to invite user';
+        toast.error(fallbackMsg);
+        throw new Error(fallbackMsg);
+      }
     } finally {
       set({ isInvitingUser: false });
     }

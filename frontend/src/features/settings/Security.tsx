@@ -11,6 +11,8 @@ import { changePassword } from '../../services/usersApi';
 import toast from 'react-hot-toast';
 import { 
   Shield, 
+  ShieldCheck,
+  ShieldAlert,
   Key, 
   Smartphone, 
   CheckCircle2, 
@@ -84,7 +86,7 @@ const SecurityOverview = ({ user }: { user: any }) => {
   );
 };
 
-const PasswordSection = ({ policy }: { policy: any }) => {
+const PasswordSection = ({ policy, onPasswordChanged }: { policy: any, onPasswordChanged?: () => void }) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -133,6 +135,7 @@ const PasswordSection = ({ policy }: { policy: any }) => {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      onPasswordChanged?.();
     } catch (error: any) {
       toast.error(error.message || 'Failed to update password');
     } finally {
@@ -222,7 +225,7 @@ const PasswordSection = ({ policy }: { policy: any }) => {
   );
 };
 
-const ActiveSessions = () => {
+const ActiveSessions = ({ onSessionsRevoked }: { onSessionsRevoked?: () => void }) => {
   const [sessions, setSessions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -249,6 +252,7 @@ const ActiveSessions = () => {
       await signOutOtherSessions();
       toast.success('Successfully signed out of other sessions');
       fetchSessions();
+      onSessionsRevoked?.();
     } catch (error) {
       toast.error('Failed to sign out of other sessions');
     } finally {
@@ -347,7 +351,54 @@ const ActiveSessions = () => {
   );
 };
 
-const SecurityEvents = () => {
+const getEventMeta = (event: any) => {
+  const browser = event.details?.browser;
+  const platform = event.details?.platform;
+  const deviceStr = browser && platform 
+    ? `${browser} on ${platform}` 
+    : (browser || platform || 'Unknown Device');
+
+  switch (event.action) {
+    case 'LOGIN':
+      return {
+        title: 'Successful Login',
+        icon: <ShieldCheck size={16} className="text-emerald-500" />,
+        deviceStr
+      };
+    case 'FAILED_LOGIN':
+      return {
+        title: 'Failed Login Attempt',
+        icon: <ShieldAlert size={16} className="text-rose-500" />,
+        deviceStr
+      };
+    case 'NEW_DEVICE_LOGIN':
+      return {
+        title: 'Login from New Device',
+        icon: <Laptop size={16} className="text-amber-500" />,
+        deviceStr
+      };
+    case 'REVOKED_OTHER_SESSIONS':
+      return {
+        title: 'Signed Out Other Devices',
+        icon: <LogOut size={16} className="text-brand-text-muted" />,
+        deviceStr
+      };
+    case 'PASSWORD_CHANGED':
+      return {
+        title: 'Password Changed',
+        icon: <Key size={16} className="text-blue-500" />,
+        deviceStr
+      };
+    default:
+      return {
+        title: event.action ? event.action.replace(/_/g, ' ') : 'Security Event',
+        icon: <Shield size={16} className="text-brand-text-muted" />,
+        deviceStr
+      };
+  }
+};
+
+const SecurityEvents = ({ refreshKey }: { refreshKey?: number }) => {
   const [events, setEvents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -363,7 +414,7 @@ const SecurityEvents = () => {
       }
     };
     fetchEvents();
-  }, []);
+  }, [refreshKey]);
 
   return (
     <div className="bg-brand-surface border border-brand-border rounded-xl shadow-sm overflow-hidden mb-8">
@@ -381,29 +432,35 @@ const SecurityEvents = () => {
             No recent activity found.
           </div>
         ) : (
-          events.map((event) => (
-            <div key={event.id} className="p-4 flex items-center justify-between hover:bg-brand-surface-low transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="bg-brand-surface-low p-2 rounded border border-brand-border">
-                  <Shield size={16} className="text-brand-text-muted" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-brand-text">
-                    {event.action === 'LOGIN' ? 'Successful Login' : 
-                     event.action === 'PASSWORD_CHANGED' ? 'Password Changed' : event.action}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-brand-text-muted mt-0.5">
-                    <span>{event.details?.browser} on {event.details?.platform}</span>
-                    <span>•</span>
-                    <span>{event.ip_address}</span>
+          events.map((event) => {
+            const meta = getEventMeta(event);
+            return (
+              <div key={event.id} className="p-4 flex items-center justify-between hover:bg-brand-surface-low transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="bg-brand-surface-low p-2 rounded border border-brand-border flex items-center justify-center">
+                    {meta.icon}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-brand-text">
+                      {meta.title}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-brand-text-muted mt-0.5">
+                      <span>{meta.deviceStr}</span>
+                      {event.ip_address && (
+                        <>
+                          <span>•</span>
+                          <span>{event.ip_address}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
+                <div className="text-xs text-brand-text-muted whitespace-nowrap">
+                  {format(new Date(event.created_at), 'MMM d, yyyy h:mm a')}
+                </div>
               </div>
-              <div className="text-xs text-brand-text-muted whitespace-nowrap">
-                {format(new Date(event.created_at), 'MMM d, yyyy h:mm a')}
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -425,6 +482,11 @@ const PlaceholderSection = ({ title, description }: { title: string, description
 export const Security: React.FC = () => {
   const { user } = useAuthStore();
   const [policy, setPolicy] = useState<any>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefreshEvents = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
 
   usePageTitle("Security");
 
@@ -440,9 +502,9 @@ export const Security: React.FC = () => {
       </div>
 
       <SecurityOverview user={user} />
-      <PasswordSection policy={policy} />
-      <ActiveSessions />
-      <SecurityEvents />
+      <PasswordSection policy={policy} onPasswordChanged={handleRefreshEvents} />
+      <ActiveSessions onSessionsRevoked={handleRefreshEvents} />
+      <SecurityEvents refreshKey={refreshKey} />
 
       <div className="bg-brand-surface border border-brand-border rounded-xl shadow-sm overflow-hidden">
         <div className="p-6 border-b border-brand-border">

@@ -65,9 +65,10 @@ api.interceptors.response.use(
     }
 
     // Normalize error so catching it is cleaner
+    let detailObj = error.response?.data?.detail;
     let message =
       error.response?.data?.error?.message ||
-      error.response?.data?.detail ||
+      (typeof detailObj === 'object' && detailObj?.message ? detailObj.message : (typeof detailObj === 'string' ? detailObj : null)) ||
       error.message ||
       "An unexpected network error occurred";
       
@@ -81,7 +82,9 @@ api.interceptors.response.use(
       message = JSON.stringify(message);
     }
     
-    return Promise.reject(new Error(message));
+    const customError: any = new Error(message);
+    customError.response = error.response;
+    return Promise.reject(customError);
   },
 );
 

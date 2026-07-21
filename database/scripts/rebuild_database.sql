@@ -15,5 +15,7 @@ CREATE SCHEMA public;
 \i ../migrations/007_triggers.sql
 \i ../migrations/008_views.sql
 \i ../migrations/009_seed_data.sql
+\i ../migrations/034_security_event_functions.sql
+\i ../migrations/035_auth_session_functions.sql
 
 \echo 'Database rebuild complete!'

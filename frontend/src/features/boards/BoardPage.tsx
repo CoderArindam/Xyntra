@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Settings, Folder } from 'lucide-react';
 import KanbanBoard from './components/KanbanBoard';
 import { useBoardStore } from '../../store/boardStore';
+import { useAuthStore } from '../../store/authStore';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ProjectIdentity } from '../../components/common/ProjectIdentity';
 import EmptyState from '../../components/common/EmptyState';
@@ -12,7 +13,10 @@ import BoardProposalsBadge from '../proposals/components/BoardProposalsBadge';
 export const Board: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { boards, fetchBoards } = useBoardStore();
+  const { user } = useAuthStore();
   
+  const userRole = (user?.role || '').toUpperCase();
+  const isManagerOrAdmin = ['SUPER_ADMIN', 'MANAGER'].includes(userRole);
 
   useEffect(() => {
     if (boards.length === 0) {
@@ -63,13 +67,15 @@ export const Board: React.FC = () => {
         {/* Settings & Proposal Badge Actions */}
         <div className="flex items-center gap-3 shrink-0">
           {boardId > 0 && <BoardProposalsBadge boardId={boardId} />}
-          <Link
-            to={`/board/${boardId}/settings`}
-            className="px-4 py-2 bg-brand-surface-low border border-brand-border hover:bg-brand-surface-hover rounded-md text-sm font-medium text-brand-text flex items-center gap-2 transition-colors"
-          >
-            <Settings size={16} />
-            Project Settings
-          </Link>
+          {isManagerOrAdmin && (
+            <Link
+              to={`/board/${boardId}/settings`}
+              className="px-4 py-2 bg-brand-surface-low border border-brand-border hover:bg-brand-surface-hover rounded-md text-sm font-medium text-brand-text flex items-center gap-2 transition-colors"
+            >
+              <Settings size={16} />
+              Project Settings
+            </Link>
+          )}
         </div>
       </header>
 

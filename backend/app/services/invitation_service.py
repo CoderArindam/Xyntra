@@ -48,8 +48,11 @@ class InvitationService:
         )
         if existing_user:
             raise HTTPException(
-                status_code=400,
-                detail="This person is already a registered user"
+                status_code=409,
+                detail={
+                    "error_code": "USER_ALREADY_EXISTS",
+                    "message": "This person is already part of the organization"
+                }
             )
 
         organization_id = current_user["organization_id"]
@@ -75,8 +78,16 @@ class InvitationService:
             return invitation, invite_in.email, org_name, token
         except asyncpg.exceptions.RaiseError as e:
             if "already a registered user" in str(e).lower():
-                raise HTTPException(status_code=400, detail="This person is already a registered user")
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error_code": "USER_ALREADY_EXISTS",
+                        "message": "This person is already part of the organization"
+                    }
+                )
             raise HTTPException(status_code=400, detail=str(e))
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error creating invitation: {e}")
             raise HTTPException(status_code=500, detail="Failed to create invitation")

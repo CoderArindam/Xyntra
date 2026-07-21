@@ -42,8 +42,9 @@ async def change_password(
     current_user: dict = Depends(get_current_user),
     user_service: UserService = Depends(get_user_service)
 ):
+    ua_string = request.headers.get("user-agent", "Unknown")[:255]
     ip_address = request.client.host if request.client else "Unknown"
-    await user_service.change_password(payload, current_user, ip_address)
+    await user_service.change_password(payload, current_user, ip_address, ua_string)
     return None
 
 

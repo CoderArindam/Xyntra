@@ -1,32 +1,52 @@
-# React + TypeScript + Vite
+# KAIO Frontend Web Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The **KAIO Frontend** is an enterprise-grade single-page web application (SPA) built using **React 18**, **TypeScript**, **Vite**, and **Tailwind CSS**.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Key Features
 
-## React Compiler
+1. **Interactive Kanban Boards**:
+   - Dynamic column re-ordering, task creation, assignment, priority tagging, and detailed modal views.
+   - Project settings modal gated by role access control (`isManagerOrAdmin`).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+2. **Meeting Automation & AI Task Proposals**:
+   - Single-click Playwright bot deployment to Google Meet sessions.
+   - Real-time meeting status bar (`JOINING`, `RECORDING`, `PROCESSING`, `PROPOSALS_READY`).
+   - Speaker-attributed transcript viewer with confidence metrics.
+   - Interactive manager approval drawer for reviewing, editing, approving (`fn_approve_task_proposal`), and rejecting AI task proposals.
 
-## Expanding the Oxlint configuration
+3. **Notification System**:
+   - Header notification bell with real-time unread badge count.
+   - In-place notification dropdown drawer with mark-all-read action.
+   - Destination deep-linking resolver (links directly to tasks, comments, boards, or task proposals).
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+4. **Security & Session Management**:
+   - Multi-device active session tab allowing users to inspect device name, OS, IP address, and last active time with session revocation.
+   - Complete login activity history log displaying authentication and security audit events.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+---
+
+## 🛠️ Tech Stack & Dependencies
+
+- **Core**: React 18, TypeScript, Vite
+- **Styling**: Tailwind CSS, Lucide React Icons
+- **State Management**: React Context (`AuthContext`, `BoardContext`, `MeetingContext`)
+- **HTTP Client**: Axios with Bearer JWT interceptors and auto-refresh logic
+- **Routing**: React Router DOM (v6+)
+
+---
+
+## 💻 Available Scripts
+
+```bash
+# Start Vite development server
+npm run dev
+
+# Typecheck and build production bundle
+npm run build
+
+# Preview production build locally
+npm run preview
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.

@@ -19,26 +19,28 @@ class AuthService:
     def parse_user_agent(self, ua_string: str) -> Tuple[str, str, str]:
         ua = ua_string.lower()
         browser = "Unknown"
-        if "chrome" in ua and "edg" not in ua:
-            browser = "Chrome"
-        elif "safari" in ua and "chrome" not in ua:
-            browser = "Safari"
-        elif "firefox" in ua:
-            browser = "Firefox"
-        elif "edg" in ua:
+        if "edg" in ua or "edge" in ua:
             browser = "Edge"
+        elif "chrome" in ua or "crios" in ua:
+            browser = "Chrome"
+        elif "firefox" in ua or "fxios" in ua:
+            browser = "Firefox"
+        elif "safari" in ua:
+            browser = "Safari"
+        elif "opera" in ua or "opr" in ua:
+            browser = "Opera"
         
         platform = "Unknown"
         if "windows" in ua:
             platform = "Windows"
-        elif "mac" in ua:
+        elif "macintosh" in ua or "mac os" in ua:
             platform = "macOS"
-        elif "linux" in ua:
-            platform = "Linux"
         elif "android" in ua:
             platform = "Android"
-        elif "iphone" in ua or "ipad" in ua:
+        elif "iphone" in ua or "ipad" in ua or "ipod" in ua:
             platform = "iOS"
+        elif "linux" in ua:
+            platform = "Linux"
             
         return browser, platform, f"{browser} on {platform}"
 
@@ -50,11 +52,7 @@ class AuthService:
         browser, platform, device_name = self.parse_user_agent(ua_string)
         
         session_id = await self.conn.fetchval(
-            """
-            INSERT INTO user_sessions (user_id, refresh_token_hash, browser, platform, device_name, ip_address, expires_at, last_active_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
-            RETURNING id
-            """,
+            "SELECT fn_create_user_session($1, $2, $3, $4, $5, $6, $7)",
             user_id, refresh_token_hash, browser, platform, device_name, ip_address, expires_at
         )
         return refresh_token, session_id
@@ -74,7 +72,7 @@ class AuthService:
                 raise HTTPException(status_code=500, detail="Failed to create organization")
 
             user_row = await self.conn.fetchrow(
-                "SELECT id, email, role, organization_id FROM users WHERE email = $1",
+                "SELECT id, email, role, organization_id FROM v_users_canonical WHERE email = $1",
                 org_in.email
             )
 
@@ -100,22 +98,38 @@ class AuthService:
 
     async def login(self, user_in: UserLogin, ua_string: str, ip_address: str) -> dict:
         user_row = await self.conn.fetchrow(
-            "SELECT id, email, password_hash, role, organization_id FROM users WHERE email = $1 AND deleted_at IS NULL",
+            "SELECT id, email, password_hash, role, organization_id FROM v_users_canonical WHERE email = $1",
             user_in.email
         )
 
-        if not user_row or not verify_password(user_in.password, user_row["password_hash"]):
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-
-        refresh_token, session_id = await self.create_session(user_row["id"], ua_string, ip_address)
         browser, platform, _ = self.parse_user_agent(ua_string)
 
+        if not user_row or not verify_password(user_in.password, user_row["password_hash"]):
+            if user_row:
+                await self.conn.execute(
+                    "SELECT fn_log_security_event($1, $2, $3, $4::entity_type_enum, $5, $6, $7::jsonb)",
+                    user_row["organization_id"], user_row["id"], "FAILED_LOGIN", "USER", user_row["id"], ip_address, json.dumps({"browser": browser, "platform": platform, "status": "Failed", "reason": "Invalid credentials"})
+                )
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        is_new_device = await self.conn.fetchval(
+            "SELECT fn_check_is_new_device($1, $2, $3)",
+            user_row["id"], browser, platform
+        )
+
+        refresh_token, session_id = await self.create_session(user_row["id"], ua_string, ip_address)
+
+        action = "NEW_DEVICE_LOGIN" if is_new_device else "LOGIN"
+        details = {
+            "browser": browser,
+            "platform": platform,
+            "status": "Success",
+            "is_new_device": bool(is_new_device)
+        }
+
         await self.conn.execute(
-            """
-            INSERT INTO audit_logs (organization_id, user_id, action, entity_type, entity_id, ip_address, details)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            """,
-            user_row["organization_id"], user_row["id"], "LOGIN", "USER", user_row["id"], ip_address, json.dumps({"browser": browser, "platform": platform, "status": "Success"})
+            "SELECT fn_log_security_event($1, $2, $3, $4::entity_type_enum, $5, $6, $7::jsonb)",
+            user_row["organization_id"], user_row["id"], action, "USER", user_row["id"], ip_address, json.dumps(details)
         )
 
         return {
@@ -127,45 +141,36 @@ class AuthService:
 
     async def refresh_token(self, token: str, ua_string: str, ip_address: str) -> dict:
         token_hash = hashlib.sha256(token.encode()).hexdigest()
+        new_refresh_token = secrets.token_urlsafe(64)
+        new_token_hash = hashlib.sha256(new_refresh_token.encode()).hexdigest()
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        browser, platform, _ = self.parse_user_agent(ua_string)
 
-        session_row = await self.conn.fetchrow(
-            """
-            SELECT id, user_id, revoked_at, expires_at 
-            FROM user_sessions 
-            WHERE refresh_token_hash = $1
-            """,
-            token_hash
+        row = await self.conn.fetchrow(
+            "SELECT session_id, user_id FROM fn_refresh_user_session($1, $2, $3, $4, $5, $6)",
+            token_hash, new_token_hash, expires_at, browser, platform, ip_address
         )
 
-        if not session_row:
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
-
-        if session_row["revoked_at"] or session_row["expires_at"].replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
-            if session_row["revoked_at"]:
-                await self.conn.execute("UPDATE user_sessions SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = $1", session_row["user_id"])
+        if not row or not row["session_id"]:
             raise HTTPException(status_code=401, detail="Session expired or revoked")
 
         user_row = await self.conn.fetchrow(
-            "SELECT id, email, role, organization_id FROM users WHERE id = $1 AND deleted_at IS NULL",
-            session_row["user_id"]
+            "SELECT id, email, role, organization_id FROM v_users_canonical WHERE id = $1",
+            row["user_id"]
         )
         if not user_row:
             raise HTTPException(status_code=401, detail="User not found")
 
-        await self.conn.execute("UPDATE user_sessions SET revoked_at = CURRENT_TIMESTAMP WHERE id = $1", session_row["id"])
-        
-        new_refresh_token, new_session_id = await self.create_session(user_row["id"], ua_string, ip_address)
-        
         return {
             "user": dict(user_row),
             "refresh_token": new_refresh_token,
-            "session_id": new_session_id,
+            "session_id": row["session_id"],
             "message": "Token refreshed"
         }
 
     async def get_me(self, current_user: dict) -> dict:
         user_row = await self.conn.fetchrow(
-            "SELECT id, email, first_name, last_name, avatar_url, role, organization_id, is_email_verified FROM users WHERE id = $1 AND deleted_at IS NULL",
+            "SELECT id, email, first_name, last_name, avatar_url, role, organization_id, is_email_verified FROM v_users_canonical WHERE id = $1",
             current_user["id"]
         )
         if not user_row:
@@ -176,52 +181,61 @@ class AuthService:
         if token:
             token_hash = hashlib.sha256(token.encode()).hexdigest()
             await self.conn.execute(
-                "UPDATE user_sessions SET revoked_at = CURRENT_TIMESTAMP WHERE refresh_token_hash = $1",
+                "SELECT fn_revoke_session_by_token_hash($1)",
                 token_hash
             )
 
     async def get_sessions(self, current_token: Optional[str], current_user: dict) -> List[dict]:
         current_token_hash = hashlib.sha256(current_token.encode()).hexdigest() if current_token else ""
+        current_session_id = current_user.get("session_id")
 
         rows = await self.conn.fetch(
-            """
-            SELECT id, browser, platform, device_name, ip_address, last_active_at, created_at, refresh_token_hash
-            FROM user_sessions
-            WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP
-            ORDER BY last_active_at DESC NULLS LAST
-            """,
+            "SELECT id, browser, platform, device_name, ip_address, last_active_at, created_at, refresh_token_hash FROM fn_get_user_sessions($1)",
             current_user["id"]
         )
         
         sessions = []
         for row in rows:
             session_dict = dict(row)
-            session_dict["is_current"] = (row["refresh_token_hash"] == current_token_hash)
+            session_dict["is_current"] = (
+                (current_session_id is not None and row["id"] == current_session_id) or
+                (bool(current_token_hash) and row["refresh_token_hash"] == current_token_hash)
+            )
             sessions.append(session_dict)
             
         return sessions
 
-    async def delete_other_sessions(self, current_token: str, current_user: dict):
-        current_token_hash = hashlib.sha256(current_token.encode()).hexdigest()
+    async def delete_other_sessions(self, current_user: dict, current_token: Optional[str] = None, ua_string: str = "Unknown", ip_address: str = "Unknown"):
+        current_session_id = current_user.get("session_id")
+        current_token_hash = hashlib.sha256(current_token.encode()).hexdigest() if current_token else None
 
         await self.conn.execute(
-            """
-            UPDATE user_sessions 
-            SET revoked_at = CURRENT_TIMESTAMP 
-            WHERE user_id = $1 AND refresh_token_hash != $2 AND revoked_at IS NULL
-            """,
-            current_user["id"], current_token_hash
+            "SELECT fn_revoke_other_user_sessions($1, $2, $3)",
+            current_user["id"], current_session_id, current_token_hash
+        )
+
+        org_id = current_user.get("organization_id")
+        if not org_id:
+            org_id = await self.conn.fetchval(
+                "SELECT organization_id FROM v_users_canonical WHERE id = $1",
+                current_user["id"]
+            )
+
+        browser, platform, _ = self.parse_user_agent(ua_string)
+        await self.conn.execute(
+            "SELECT fn_log_security_event($1, $2, $3, $4::entity_type_enum, $5, $6, $7::jsonb)",
+            org_id,
+            current_user["id"],
+            "REVOKED_OTHER_SESSIONS",
+            "USER",
+            current_user["id"],
+            ip_address,
+            json.dumps({"browser": browser, "platform": platform, "status": "Success"})
         )
 
     async def get_security_events(self, current_user: dict) -> List[dict]:
         rows = await self.conn.fetch(
-            """
-            SELECT id, action, ip_address, details, created_at
-            FROM audit_logs
-            WHERE user_id = $1
-            ORDER BY created_at DESC
-            LIMIT 50
-            """,
+            "SELECT id, action, ip_address, details, created_at FROM fn_get_user_security_events($1, 50)",
             current_user["id"]
         )
         

@@ -21,8 +21,8 @@ backend/
 │   ├── constants/             # Constant definitions and static values
 │   ├── database/              # PostgreSQL database initialization and operations
 │   ├── meeting/               # Isolated meeting automation module
-│   ├── routers/               # Core Kanban domain HTTP routes
-│   ├── schemas/               # Request validation & response schemas
+│   ├── routers/               # 17 REST API route handlers (auth, boards, tasks, comments, attachments, activity, board_members, admin, invitations, notifications, my_work, preferences, organization, ai, task_proposals, meeting)
+│   ├── schemas/               # Request validation & response DTO schemas
 │   └── services/              # Transactional business logic implementation layer
 ```
 
@@ -39,15 +39,16 @@ Configuration across the backend relies heavily on `pydantic-settings`.
 Each major subsystem manages its own `.env` schema (e.g. `Settings`, `AISettings`, `MeetingSettings` with prefixed variables) ensuring strong typing, validation, and domain separation.
 
 ### 3. Database Architecture ([app/database](file:///d:/kanban-project/backend/app/database))
-The database uses `asyncpg` for high-performance, asynchronous PostgreSQL connectivity.
+The database uses `asyncpg` for high-performance, asynchronous PostgreSQL connectivity across 35 migration scripts (`001_*.sql` to `035_*.sql`).
 * **Connection Pooling**: Managed via `asyncpg.create_pool` with configurable min/max sizing.
 * **JSON Codecs**: Custom codecs are bound to parse `json` and `jsonb` natively to Python dicts.
 > [!IMPORTANT]
 > **Database Rules**: Do NOT use raw SQL queries (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) in routers or services. All persistence must go through PostgreSQL user-defined functions (UDFs) or canonical views (`v_..._canonical`). This enforces database-level encapsulation.
 
-### 4. Authentication Mechanism ([app/auth](file:///d:/kanban-project/backend/app/auth))
-* **JWT Tokens**: Authentication relies on robust stateless JWT tokens (access and refresh tokens).
-* **Storage**: Tokens are securely returned via HTTP-only, `samesite=lax` cookies to mitigate XSS and CSRF attacks.
+### 4. Authentication & Security Subsystem ([app/auth](file:///d:/kanban-project/backend/app/auth))
+* **JWT Tokens**: Authentication relies on robust stateless JWT access tokens and refresh tokens.
+* **Multi-Device Sessions**: Tracks active sessions in `active_sessions` database table with user agent and IP address (`fn_refresh_session`, `fn_revoke_session`).
+* **Security Event Logging**: Audit log (`fn_log_security_event`) tracking logins, logouts, session revocations, password updates, and role modifications.
 * **Hashing**: Passwords are one-way hashed using `bcrypt` (via `passlib`).
 
 ### 5. AI Subassistant: [app/ai](file:///d:/kanban-project/backend/app/ai)

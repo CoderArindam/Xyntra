@@ -30,6 +30,7 @@ const UsersManagement: React.FC = () => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState('MEMBER');
+  const [inviteError, setInviteError] = useState<string | null>(null);
   
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
 
@@ -38,16 +39,22 @@ const UsersManagement: React.FC = () => {
     fetchInvitations();
   }, [fetchUsers, fetchInvitations]);
 
+  const closeInviteModal = () => {
+    setIsInviteModalOpen(false);
+    setInviteError(null);
+  };
+
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmail) return;
+    setInviteError(null);
     try {
       await inviteUser(newEmail, newRole);
-      setIsInviteModalOpen(false);
+      closeInviteModal();
       setNewEmail('');
       setNewRole('MEMBER');
-    } catch (error) {
-      // Handled by store
+    } catch (error: any) {
+      setInviteError(error?.message || 'Failed to invite user');
     }
   };
 
@@ -225,12 +232,12 @@ const UsersManagement: React.FC = () => {
       {/* Invite Modal */}
       {isInviteModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsInviteModalOpen(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeInviteModal} />
           <div className="bg-brand-surface border border-brand-border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative z-10 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-6 border-b border-brand-border">
               <h2 className="text-xl font-bold text-brand-text">Invite User</h2>
               <button 
-                onClick={() => setIsInviteModalOpen(false)}
+                onClick={closeInviteModal}
                 className="text-brand-text-muted hover:text-brand-text bg-brand-surface-low hover:bg-brand-border p-2 rounded-full transition-colors"
               >
                 <X size={20} />
@@ -249,6 +256,13 @@ const UsersManagement: React.FC = () => {
                   <p className="text-sm text-brand-text-muted mt-1">Invite a new member to join your workspace</p>
                 )}
               </div>
+
+              {inviteError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-500 flex items-center gap-2">
+                  <AlertTriangle size={16} className="shrink-0" />
+                  <span>{inviteError}</span>
+                </div>
+              )}
 
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-semibold text-brand-text">Email Address</label>
@@ -293,7 +307,7 @@ const UsersManagement: React.FC = () => {
               <div className="mt-2 flex gap-3 justify-end">
                 <button
                   type="button"
-                  onClick={() => setIsInviteModalOpen(false)}
+                  onClick={closeInviteModal}
                   className="px-5 py-2.5 rounded-xl text-sm font-medium text-brand-text-muted hover:text-brand-text hover:bg-brand-surface-low transition-colors"
                 >
                   Cancel

@@ -1,8 +1,9 @@
 import React from 'react';
-import { Outlet, NavLink, useParams, Link } from 'react-router-dom';
+import { Outlet, NavLink, useParams, Link, Navigate } from 'react-router-dom';
 import { Settings, Users, GitMerge, Tag, Zap, Puzzle, ChevronRight, LayoutDashboard } from 'lucide-react';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { useProjectSettingsStore } from '../../store/projectSettingsStore';
+import { useAuthStore } from '../../store/authStore';
 
 const SETTINGS_NAV = [
   { name: 'General', path: '', icon: Settings, activeExact: true },
@@ -16,6 +17,12 @@ const SETTINGS_NAV = [
 export const ProjectSettingsLayout: React.FC = () => {
   const { boardId } = useParams<{ boardId: string }>();
   const { currentSettings, fetchSettings, isLoading } = useProjectSettingsStore();
+  const { user } = useAuthStore();
+
+  const userRole = (user?.role || '').toUpperCase();
+  if (userRole === 'MEMBER') {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   React.useEffect(() => {
     if (boardId) {
@@ -72,7 +79,7 @@ export const ProjectSettingsLayout: React.FC = () => {
               {SETTINGS_NAV.map((item) => (
                 <NavLink
                   key={item.name}
-                  to={`/boards/${boardId}/settings/${item.path}`}
+                  to={`/board/${boardId}/settings/${item.path}`}
                   end={item.activeExact}
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${

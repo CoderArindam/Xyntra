@@ -65,6 +65,10 @@ class BoardService:
         if not has_access:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         
+        role = current_user.get("role", "MEMBER")
+        if role not in ("SUPER_ADMIN", "MANAGER"):
+            raise HTTPException(status_code=403, detail="Only Managers or Super Admins can access project settings")
+        
         return await ProjectSettingsService.get_settings(self.conn, board_id)
 
     async def update_project_settings(self, board_id: int, updates: ProjectSettingsUpdate, current_user: dict) -> ProjectSettingsResponse:

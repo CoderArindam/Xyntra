@@ -160,10 +160,9 @@ async def delete_other_sessions(
     auth_service: AuthService = Depends(get_auth_service)
 ):
     current_token = request.cookies.get("refresh_token")
-    if not current_token:
-        raise HTTPException(status_code=401, detail="Refresh token missing")
-        
-    await auth_service.delete_other_sessions(current_token, current_user)
+    ua_string = request.headers.get("user-agent", "Unknown")[:255]
+    ip_address = request.client.host if request.client else "Unknown"
+    await auth_service.delete_other_sessions(current_user, current_token, ua_string, ip_address)
     return {"message": "Other sessions revoked successfully"}
 
 @router.get("/security-events", response_model=List[SecurityEventResponse])

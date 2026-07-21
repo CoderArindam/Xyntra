@@ -39,11 +39,11 @@ async def get_current_user(
 
     # Immediately reject if the session is revoked
     if session_id:
-        revoked_at = await conn.fetchval(
-            "SELECT revoked_at FROM user_sessions WHERE id = $1", 
+        is_revoked = await conn.fetchval(
+            "SELECT fn_is_session_revoked($1)", 
             session_id
         )
-        if revoked_at is not None:
+        if is_revoked:
             raise credentials_exception
 
     return {

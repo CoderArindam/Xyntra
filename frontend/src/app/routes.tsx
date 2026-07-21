@@ -64,61 +64,70 @@ export const AppRoutes: React.FC = () => {
             <Route path="/meeting/:sessionId/proposals" element={<ProposalQueueView />} />
           </Route>
 
-          <Route
-            path="/board/:boardId/settings"
-            element={<ProjectSettingsLayout />}
-          >
-            <Route index element={<ProjectSettingsPage />} />
+          {/* Role-gated project settings routes */}
+          <Route element={<RequireRole allowedRoles={['SUPER_ADMIN', 'MANAGER']} />}>
             <Route
-              path="members"
-              element={
-                <PlaceholderSetting
-                  title="Members"
-                  description="Manage project access."
-                  Icon={Users}
-                />
-              }
-            />
+              path="/board/:boardId/settings"
+              element={<ProjectSettingsLayout />}
+            >
+              <Route index element={<ProjectSettingsPage />} />
+              <Route
+                path="members"
+                element={
+                  <PlaceholderSetting
+                    title="Members"
+                    description="Manage project access."
+                    Icon={Users}
+                  />
+                }
+              />
+              <Route
+                path="workflow"
+                element={
+                  <PlaceholderSetting
+                    title="Workflow"
+                    description="Customize project statuses and transitions."
+                    Icon={GitMerge}
+                  />
+                }
+              />
+              <Route
+                path="labels"
+                element={
+                  <PlaceholderSetting
+                    title="Labels"
+                    description="Manage project tags and labels."
+                    Icon={Tag}
+                  />
+                }
+              />
+              <Route
+                path="automation"
+                element={
+                  <PlaceholderSetting
+                    title="Automation"
+                    description="Create rules to automate repetitive tasks."
+                    Icon={Zap}
+                  />
+                }
+              />
+              <Route
+                path="integrations"
+                element={
+                  <PlaceholderSetting
+                    title="Integrations"
+                    description="Connect this project to other tools."
+                    Icon={Puzzle}
+                  />
+                }
+              />
+            </Route>
             <Route
-              path="workflow"
-              element={
-                <PlaceholderSetting
-                  title="Workflow"
-                  description="Customize project statuses and transitions."
-                  Icon={GitMerge}
-                />
-              }
-            />
-            <Route
-              path="labels"
-              element={
-                <PlaceholderSetting
-                  title="Labels"
-                  description="Manage project tags and labels."
-                  Icon={Tag}
-                />
-              }
-            />
-            <Route
-              path="automation"
-              element={
-                <PlaceholderSetting
-                  title="Automation"
-                  description="Create rules to automate repetitive tasks."
-                  Icon={Zap}
-                />
-              }
-            />
-            <Route
-              path="integrations"
-              element={
-                <PlaceholderSetting
-                  title="Integrations"
-                  description="Connect this project to other tools."
-                  Icon={Puzzle}
-                />
-              }
-            />
+              path="/boards/:boardId/settings"
+              element={<ProjectSettingsLayout />}
+            >
+              <Route index element={<ProjectSettingsPage />} />
+            </Route>
           </Route>
           {/* Settings Routes */}
           <Route path="/settings" element={<SettingsLayout />}>

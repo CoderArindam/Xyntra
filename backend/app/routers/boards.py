@@ -38,7 +38,7 @@ async def get_user_boards(
 @router.get("/{board_id}/settings", response_model=DataEnvelope[ProjectSettingsResponse])
 async def get_project_settings(
     board_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_manager_or_above),
     board_service: BoardService = Depends(get_board_service)
 ):
     settings = await board_service.get_project_settings(board_id, current_user)
@@ -48,7 +48,7 @@ async def get_project_settings(
 async def update_project_settings(
     board_id: int,
     updates: ProjectSettingsUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_manager_or_above),
     board_service: BoardService = Depends(get_board_service)
 ):
     settings = await board_service.update_project_settings(board_id, updates, current_user)
@@ -57,7 +57,7 @@ async def update_project_settings(
 @router.post("/{board_id}/archive", response_model=DataEnvelope[ProjectSettingsResponse])
 async def archive_project(
     board_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_manager_or_above),
     board_service: BoardService = Depends(get_board_service)
 ):
     settings = await board_service.archive_project(board_id, current_user)
