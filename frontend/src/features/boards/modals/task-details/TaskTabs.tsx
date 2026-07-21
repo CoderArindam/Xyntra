@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CommentsTab from './tabs/CommentsTab';
 import AttachmentsTab from './tabs/AttachmentsTab';
 import ActivityTab from './tabs/ActivityTab';
 import { type Task } from '../../../../services/tasksApi';
 import { type User } from '../../../../services/usersApi';
+import { useUiStore } from '../../../../store/uiStore';
 
 interface TaskTabsProps {
   task: Task;
@@ -14,7 +15,14 @@ interface TaskTabsProps {
 type TabType = 'comments' | 'attachments' | 'activity';
 
 const TaskTabs: React.FC<TaskTabsProps> = ({ task, currentUserId, users }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('comments');
+  const storeActiveTab = useUiStore((state) => state.activeTaskTab);
+  const [activeTab, setActiveTab] = useState<TabType>(storeActiveTab || 'comments');
+
+  useEffect(() => {
+    if (storeActiveTab) {
+      setActiveTab(storeActiveTab);
+    }
+  }, [storeActiveTab]);
 
   return (
     <div className="mt-8">

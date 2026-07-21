@@ -34,6 +34,15 @@ async def mark_read(
     await notification_service.mark_read(notification_id, current_user)
     return None
 
+@router.patch("/notifications/{notification_id}/unread", status_code=204)
+async def mark_unread(
+    notification_id: int,
+    current_user: dict = Depends(get_current_user),
+    notification_service: NotificationService = Depends(get_notification_service)
+):
+    await notification_service.mark_unread(notification_id, current_user)
+    return None
+
 @router.patch("/notifications/read-batch", status_code=204)
 async def mark_batch_read(
     payload: MarkBatchReadRequest,

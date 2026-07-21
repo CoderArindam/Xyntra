@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { 
   getNotifications, 
   markNotificationRead, 
+  markNotificationUnread,
   markAllRead, 
   deleteNotification,
   markBatchRead
@@ -15,9 +16,11 @@ interface NotificationState {
   total: number;
   hasMore: boolean;
   isLoading: boolean;
+  cursor: number | null;
   
-  fetchNotifications: (offset?: number) => Promise<void>;
+  fetchNotifications: (cursor?: number | null) => Promise<void>;
   markAsRead: (id: number) => Promise<void>;
+  markAsUnread: (id: number) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   markBatchAsRead: (ids: number[]) => Promise<void>;
   removeNotification: (id: number) => Promise<void>;
@@ -34,16 +37,21 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   fetchNotifications: async (currentCursor: number | null = null) => {
     set({ isLoading: true });
     try {
-      const response = await getNotifications(currentCursor, 20);
+      const apiCursor = (currentCursor === null || currentCursor === undefined) ? null : currentCursor;
+      const response = await getNotifications(apiCursor, 20);
       
       set((state) => {
-        const isFirstPage = currentCursor === null;
+        const isFirstPage = apiCursor === null;
         const existingNotifications = isFirstPage ? [] : state.notifications;
         const newNotifications = response.data;
+        const combined = isFirstPage ? newNotifications : [...existingNotifications, ...newNotifications];
+        
+        // Ensure no duplicate IDs
+        const uniqueNotifications = Array.from(new Map(combined.map(n => [n.id, n])).values());
         
         return {
-          notifications: [...existingNotifications, ...newNotifications],
-          unreadCount: response.data.filter(n => !n.is_read).length,
+          notifications: uniqueNotifications,
+          unreadCount: uniqueNotifications.filter(n => !n.is_read).length,
           hasMore: response.meta.has_more,
           cursor: response.meta.cursor ? Number(response.meta.cursor) : null,
           isLoading: false,
@@ -78,6 +86,30 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         unreadCount
       });
       toast.error('Failed to mark notification as read');
+    }
+  },
+
+  markAsUnread: async (id: number) => {
+    const { notifications, unreadCount } = get();
+    const notification = notifications.find(n => n.id === id);
+    
+    if (!notification || !notification.is_read) return;
+
+    // Optimistic update
+    set({
+      notifications: notifications.map(n => n.id === id ? { ...n, is_read: false } : n),
+      unreadCount: unreadCount + 1
+    });
+
+    try {
+      await markNotificationUnread(id);
+    } catch (error) {
+      // Rollback
+      set({
+        notifications,
+        unreadCount
+      });
+      toast.error('Failed to mark notification as unread');
     }
   },
 

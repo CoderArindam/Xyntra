@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAIChat } from '../hooks/useAIChat';
-import { Sparkles, ArrowRight, Layout, ListTodo, Calendar, BrainCircuit, Settings } from 'lucide-react';
+import { ArrowRight, Layout, ListTodo, BrainCircuit, Settings } from 'lucide-react';
 
 const SUGGESTIONS = [
   { text: "What am I working on?", icon: <ListTodo className="w-4 h-4" /> },

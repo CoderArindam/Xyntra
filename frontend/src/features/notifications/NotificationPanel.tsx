@@ -1,17 +1,20 @@
 import React, { useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useNotificationStore } from '../../store/notificationStore';
 import NotificationItem from '../notifications/NotificationItem';
-import { Bell, CheckCheck, Loader2 } from 'lucide-react';
+import { Bell, CheckCheck, Loader2, ExternalLink } from 'lucide-react';
 
 interface NotificationPanelProps {
   onClose: () => void;
+  className?: string;
 }
 
-const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose }) => {
+const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose, className = '' }) => {
   const { 
     notifications, 
     isLoading, 
     hasMore, 
+    cursor,
     fetchNotifications, 
     markAllAsRead,
     markAsRead,
@@ -51,7 +54,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose }) => {
   // Initial fetch on mount if empty
   useEffect(() => {
     if (notifications.length === 0) {
-      fetchNotifications(0);
+      fetchNotifications(null);
     }
   }, [fetchNotifications, notifications.length]);
 
@@ -59,8 +62,8 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose }) => {
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
-        if (entries[0].isIntersecting && hasMore && !isLoading) {
-          fetchNotifications(notifications.length);
+        if (entries[0].isIntersecting && hasMore && !isLoading && cursor) {
+          fetchNotifications(cursor);
         }
       },
       { threshold: 0.1 }
@@ -71,7 +74,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose }) => {
     }
 
     return () => observer.disconnect();
-  }, [hasMore, isLoading, fetchNotifications, notifications.length]);
+  }, [hasMore, isLoading, fetchNotifications, cursor]);
 
   // Click outside to close
   useEffect(() => {
@@ -87,7 +90,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose }) => {
   return (
     <div 
       ref={panelRef}
-      className="absolute top-full right-0 mt-2 w-96 max-h-[85vh] bg-brand-surface border border-brand-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden"
+      className={`absolute w-96 max-h-[85vh] bg-brand-surface border border-brand-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden ${className}`}
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-brand-border bg-brand-surface-low">
@@ -146,6 +149,18 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose }) => {
             {isLoading ? <Loader2 size={20} className="animate-spin text-brand-text-muted" /> : <div className="h-4" />}
           </div>
         )}
+      </div>
+
+      {/* Footer / View All Link */}
+      <div className="p-3 border-t border-brand-border bg-brand-surface-low text-center">
+        <Link 
+          to="/settings/notifications" 
+          onClick={onClose}
+          className="text-xs font-semibold text-brand-primary hover:text-brand-primary-hover flex items-center justify-center gap-1 py-1 transition-colors"
+        >
+          View all notifications
+          <ExternalLink size={13} />
+        </Link>
       </div>
     </div>
   );

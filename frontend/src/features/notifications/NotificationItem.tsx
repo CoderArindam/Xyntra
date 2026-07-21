@@ -1,30 +1,37 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Notification } from '../../services/notificationsApi';
 import { formatActivity } from '../activity/utils/activityFormatter';
-import { Check, Trash2 } from 'lucide-react';
+import { Check, MailOpen, Trash2 } from 'lucide-react';
 import { useUiStore } from '../../store/uiStore';
+import { resolveNotificationDestination, executeNotificationNavigation } from './utils/notificationResolver';
 
 interface NotificationItemProps {
   notification: Notification;
   onMarkRead: (id: number) => void;
+  onMarkUnread?: (id: number) => void;
   onDelete: (id: number) => void;
-  onClosePanel: () => void;
+  onClosePanel?: () => void;
 }
 
 const NotificationItem: React.FC<NotificationItemProps> = ({
   notification,
   onMarkRead,
+  onMarkUnread,
   onDelete,
   onClosePanel,
 }) => {
+  const navigate = useNavigate();
   const { is_read } = notification;
   const mockActivity = {
     activity_type: notification.activity_type,
     actor_first_name: notification.activity_actor_first_name,
     actor_last_name: notification.activity_actor_last_name,
-    actor_email: 'Someone'
+    actor_email: 'Someone',
+    old_value: notification.activity_old_value,
+    new_value: notification.activity_new_value,
   } as any;
-  const formatted = formatActivity(mockActivity);
+  const formatted = formatActivity(mockActivity, notification.user_id);
   const openTaskModal = useUiStore((state) => state.openTaskModal);
 
   const handleClick = () => {
@@ -32,20 +39,21 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
       onMarkRead(notification.id);
     }
 
-    // Entity-based navigation
-    if (notification.activity_entity_type === "TASK") {
-      openTaskModal(notification.activity_entity_id);
-    } else if (notification.activity_entity_type === "BOARD") {
-      // Future: Navigate to board
-    }
+    const destination = resolveNotificationDestination(notification);
+    executeNotificationNavigation(destination, {
+      navigate,
+      openTaskModal,
+    });
 
-    onClosePanel();
+    if (onClosePanel) {
+      onClosePanel();
+    }
   };
 
   return (
     <div
       className={`group relative flex gap-4 p-4 hover:bg-brand-surface-low transition-colors border-b border-brand-border last:border-0 cursor-pointer ${
-        !is_read ? "bg-brand-surface" : "bg-transparent opacity-75"
+        !is_read ? "bg-brand-surface font-medium" : "bg-transparent opacity-75"
       }`}
       onClick={handleClick}
     >
@@ -85,8 +93,8 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
       </div>
 
       {/* Quick Actions */}
-      <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        {!is_read && (
+      <div className="flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity justify-center">
+        {!is_read ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -97,6 +105,19 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
           >
             <Check size={16} />
           </button>
+        ) : (
+          onMarkUnread && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMarkUnread(notification.id);
+              }}
+              className="p-1.5 text-brand-text-muted hover:text-brand-primary hover:bg-brand-surface-low rounded-md transition-colors"
+              title="Mark as unread"
+            >
+              <MailOpen size={16} />
+            </button>
+          )
         )}
         <button
           onClick={(e) => {

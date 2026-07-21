@@ -18,9 +18,11 @@ import { type Task } from '../../../../../services/tasksApi';
 import { type User } from '../../../../../services/usersApi';
 import toast from 'react-hot-toast';
 import { useActivityStore } from '../../../../../store/activityStore';
+import { useAuthStore } from '../../../../../store/authStore';
 import ConfirmDialog from '../../../../../components/common/ConfirmDialog';
 import { UserAvatar } from '../../../../../components/common/UserAvatar';
 import { formatUserName } from '../../../../../utils/userHelpers';
+import { useUiStore } from '../../../../../store/uiStore';
 
 interface CommentsTabProps {
   task: Task;
@@ -42,10 +44,17 @@ const CommentsTab: React.FC<CommentsTabProps> = ({
   const [mentionSearch, setMentionSearch] = useState("");
   const [cursorPos, setCursorPos] = useState(0);
 
+  const { user: authUser } = useAuthStore();
+  const highlightedCommentId = useUiStore((state) => state.highlightedCommentId);
   const [commentToDelete, setCommentToDelete] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const canDeleteComment = (commentUserId: number | null) => {
+    if (!commentUserId) return false;
+    return currentUserId === commentUserId || authUser?.role === 'SUPER_ADMIN' || authUser?.role === 'MANAGER';
+  };
 
   const fetchComments = async () => {
     setIsLoading(true);
@@ -63,6 +72,17 @@ const CommentsTab: React.FC<CommentsTabProps> = ({
     fetchComments();
   }, [task.id]);
 
+  useEffect(() => {
+    if (!isLoading && comments.length > 0 && highlightedCommentId) {
+      setTimeout(() => {
+        const el = document.getElementById(`comment-${highlightedCommentId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+  }, [isLoading, comments.length, highlightedCommentId]);
+
   const handleAddComment = async () => {
     if (!newCommentText.trim()) return;
     setIsSubmitting(true);
@@ -79,9 +99,10 @@ const CommentsTab: React.FC<CommentsTabProps> = ({
         old_value: null, new_value: null, metadata: {}
       });
       toast.success("Comment added");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create comment", error);
-      toast.error("Failed to create comment");
+      const detail = error.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : "Failed to create comment");
     } finally {
       setIsSubmitting(false);
     }
@@ -98,9 +119,10 @@ const CommentsTab: React.FC<CommentsTabProps> = ({
         old_value: null, new_value: null, metadata: {}
       });
       toast.success("Comment deleted");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete comment", error);
-      toast.error("Failed to delete comment");
+      const detail = error.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : "Failed to delete comment");
     } finally {
       setIsDeleting(false);
       setCommentToDelete(null);
@@ -173,7 +195,15 @@ const CommentsTab: React.FC<CommentsTabProps> = ({
             );
 
             return (
-              <div key={item.id} className="flex gap-3">
+              <div 
+                key={item.id} 
+                id={`comment-${item.id}`}
+                className={`flex gap-3 p-2 rounded-lg transition-all ${
+                  highlightedCommentId === item.id 
+                    ? 'ring-2 ring-brand-primary bg-brand-primary/10' 
+                    : ''
+                }`}
+              >
                 <UserAvatar user={itemUser} size="md" />
 
                 <div className="flex-1">
@@ -200,7 +230,7 @@ const CommentsTab: React.FC<CommentsTabProps> = ({
                     >
                       <Reply size={14} /> Reply
                     </button>
-                    {currentUserId === item.user_id && (
+                    {canDeleteComment(item.user_id) && (
                       <button
                         onClick={() => setCommentToDelete(item.id)}
                         className="hover:text-red-500 flex items-center gap-1"
@@ -220,7 +250,15 @@ const CommentsTab: React.FC<CommentsTabProps> = ({
                           avatar_url: reply.user_avatar_url
                         };
                         return (
-                          <div key={reply.id} className="flex gap-2">
+                          <div 
+                            key={reply.id} 
+                            id={`comment-${reply.id}`}
+                            className={`flex gap-2 p-1.5 rounded transition-all ${
+                              highlightedCommentId === reply.id 
+                                ? 'ring-2 ring-brand-primary bg-brand-primary/10' 
+                                : ''
+                            }`}
+                          >
                             <UserAvatar user={replyUser} size="sm" />
                             <div className="flex-1">
                               <div className="flex justify-between">
@@ -231,7 +269,7 @@ const CommentsTab: React.FC<CommentsTabProps> = ({
                               <div className="mt-1 bg-brand-surface-low border border-brand-border rounded p-2 text-xs whitespace-pre-wrap text-brand-text">
                                 {reply.content}
                               </div>
-                              {currentUserId === reply.user_id && (
+                              {canDeleteComment(reply.user_id) && (
                                 <button
                                   onClick={() => setCommentToDelete(reply.id)}
                                   className="text-[10px] text-brand-text-muted hover:text-red-500 mt-1"

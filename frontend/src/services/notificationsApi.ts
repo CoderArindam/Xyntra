@@ -10,7 +10,10 @@ export interface CanonicalNotification {
     activity_entity_type: string;
     activity_entity_id: number;
     activity_type: string;
+    activity_old_value?: any;
+    activity_new_value?: any;
     activity_target_reference: string | null;
+    activity_target_board_id?: number | null;
     activity_actor_first_name: string | null;
     activity_actor_last_name: string | null;
     activity_actor_avatar_url: string | null;
@@ -37,6 +40,10 @@ export const getNotifications = async (cursor: number | null = null, limit: numb
 
 export const markNotificationRead = async (id: number): Promise<void> => {
   await api.patch(`/notifications/${id}/read`);
+};
+
+export const markNotificationUnread = async (id: number): Promise<void> => {
+  await api.patch(`/notifications/${id}/unread`);
 };
 
 export const markBatchRead = async (ids: number[]): Promise<void> => {

@@ -20,19 +20,8 @@ class CommentService:
             async with self.conn.transaction():
                 await self.conn.execute("SELECT set_config('app.current_user_id', $1, true)", str(current_user["id"]))
                 comment_id = await self.conn.fetchval(
-                    """
-                    INSERT INTO task_comments (task_id, user_id, parent_comment_id, content)
-                    VALUES ($1, $2, $3, $4) RETURNING id
-                    """,
-                    task_id, current_user["id"], comment_in.parent_comment_id, comment_in.content
-                )
-
-                activity_id = await self.conn.fetchval(
-                    """
-                    INSERT INTO activities (organization_id, entity_type, entity_id, user_id, activity_type, new_value)
-                    VALUES ($1, 'COMMENT', $2, $3, 'COMMENT_ADDED', $4) RETURNING id
-                    """,
-                    current_user["organization_id"], task_id, current_user["id"], '{"content": "New comment added"}'
+                    "SELECT fn_create_comment($1, $2, $3, $4, $5)",
+                    task_id, current_user["id"], comment_in.parent_comment_id, comment_in.content, current_user["organization_id"]
                 )
 
                 task_row = await self.conn.fetchrow("SELECT * FROM v_tasks_canonical WHERE id = $1", task_id)
@@ -42,26 +31,15 @@ class CommentService:
                     parent_user = await self.conn.fetchrow(
                         """
                         SELECT u.id, u.email, u.first_name 
-                        FROM task_comments c 
+                        FROM v_comments_canonical c 
                         JOIN users u ON c.user_id = u.id 
                         WHERE c.id = $1
                         """,
                         comment_in.parent_comment_id
                     )
-                    if parent_user and parent_user["id"] != current_user["id"]:
-                        if not task_row or parent_user["id"] != task_row["assigned_to"]:
-                            await self.conn.execute(
-                                "INSERT INTO notifications (user_id, activity_id) VALUES ($1, $2)",
-                                parent_user["id"], activity_id
-                            )
 
                 row = await self.conn.fetchrow(
-                    """
-                    SELECT c.*, u.first_name as user_first_name, u.last_name as user_last_name, u.avatar_url as user_avatar_url, u.email as user_email
-                    FROM task_comments c
-                    JOIN users u ON c.user_id = u.id
-                    WHERE c.id = $1
-                    """,
+                    "SELECT * FROM v_comments_canonical WHERE id = $1",
                     comment_id
                 )
 
@@ -80,11 +58,9 @@ class CommentService:
 
             rows = await self.conn.fetch(
                 """
-                SELECT c.*, u.first_name as user_first_name, u.last_name as user_last_name, u.avatar_url as user_avatar_url, u.email as user_email
-                FROM task_comments c
-                JOIN users u ON c.user_id = u.id
-                WHERE c.task_id = $1 AND c.deleted_at IS NULL
-                ORDER BY c.created_at ASC
+                SELECT * FROM v_comments_canonical
+                WHERE task_id = $1
+                ORDER BY created_at ASC
                 """,
                 task_id
             )
@@ -97,31 +73,19 @@ class CommentService:
 
     async def delete_comment(self, comment_id: int, current_user: dict):
         try:
-            row = await self.conn.fetchrow(
-                """
-                SELECT c.user_id, t.board_id, b.organization_id 
-                FROM task_comments c
-                JOIN tasks t ON c.task_id = t.id
-                JOIN boards b ON t.board_id = b.id
-                WHERE c.id = $1 AND c.deleted_at IS NULL
-                """,
-                comment_id
-            )
-            if not row:
-                raise HTTPException(status_code=404, detail="Comment not found")
-                
-            if row["organization_id"] != current_user["organization_id"]:
-                raise HTTPException(status_code=403, detail="Access denied")
-
-            if row["user_id"] != current_user["id"] and current_user.get("role") not in ("SUPER_ADMIN", "MANAGER"):
-                raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
-
             async with self.conn.transaction():
                 await self.conn.execute("SELECT set_config('app.current_user_id', $1, true)", str(current_user["id"]))
-                await self.conn.execute("UPDATE task_comments SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1", comment_id)
-                
+                await self.conn.execute(
+                    "SELECT fn_delete_comment($1, $2, $3, $4)",
+                    comment_id, current_user["id"], current_user.get("role", "MEMBER"), current_user["organization_id"]
+                )
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f'Unexpected error: {e}')
-            raise HTTPException(status_code=400, detail='An unexpected error occurred')
+            err_msg = str(e)
+            logger.error(f'Error deleting comment: {err_msg}')
+            if 'Comment not found' in err_msg:
+                raise HTTPException(status_code=404, detail="Comment not found")
+            elif 'Access denied' in err_msg or 'Not authorized' in err_msg:
+                raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
+            raise HTTPException(status_code=400, detail=err_msg if isinstance(e, asyncpg.exceptions.PostgresError) else 'An unexpected error occurred')

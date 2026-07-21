@@ -9,18 +9,22 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { login } = useAuthStore();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
     setIsSubmitting(true);
     try {
       await login(email, password);
       toast.success("Logged in successfully");
       navigate("/dashboard");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Login failed. Please check your credentials.");
+      const msg = error instanceof Error ? error.message : "Invalid email or password";
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -46,6 +50,11 @@ export const Login: React.FC = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {errorMessage && (
+            <div className="p-3 text-xs font-medium text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg">
+              {errorMessage}
+            </div>
+          )}
           {/* Email */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-brand-text-muted">

@@ -105,6 +105,15 @@ class NotificationService:
         except Exception as e:
             raise HTTPException(status_code=500, detail="Failed to mark notification as read")
 
+    async def mark_unread(self, notification_id: int, current_user: dict):
+        try:
+            await self.conn.execute(
+                "UPDATE notifications SET is_read = false WHERE id = $1 AND user_id = $2",
+                notification_id, current_user["id"]
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Failed to mark notification as unread")
+
     async def mark_batch_read(self, payload: MarkBatchReadRequest, current_user: dict):
         if not payload.notification_ids:
             return

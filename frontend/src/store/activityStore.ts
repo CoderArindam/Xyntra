@@ -21,30 +21,37 @@ export const useActivityStore = create<ActivityState>((set, get) => ({
   loading: {},
   error: {},
 
-  fetchActivity: async (taskId, limit = 50) => {
-    const currentCursor = get().cursorByTask[taskId] || null;
-    
+  fetchActivity: async (taskId, limit = 50, reset = true) => {
     set((state) => ({
       loading: { ...state.loading, [taskId]: true },
-      error: { ...state.error, [taskId]: null }
+      error: { ...state.error, [taskId]: null },
+      ...(reset ? { cursorByTask: { ...state.cursorByTask, [taskId]: null } } : {})
     }));
 
     try {
-      const response = await getTaskActivity(taskId, currentCursor, limit);
+      const cursor = reset ? null : (get().cursorByTask[taskId] || null);
+      const response = await getTaskActivity(taskId, cursor, limit);
       
       set((state) => {
-        const existingActivities = currentCursor === null ? [] : (state.activitiesByTask[taskId] || []);
+        const currentList = reset ? [] : (state.activitiesByTask[taskId] || []);
         
-        // Filter out duplicates in case of race conditions with optimistic updates
-        const existingIds = new Set(existingActivities.map(a => a.id));
-        const newActivities = response.data.filter(a => !existingIds.has(a.id));
+        // Merge server response with current optimistic items
+        const map = new Map<number, Activity>();
+        response.data.forEach(a => map.set(a.id, a));
+        currentList.forEach(a => {
+          if (!map.has(a.id)) {
+            map.set(a.id, a);
+          }
+        });
+
+        const sorted = Array.from(map.values()).sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
 
         return {
           activitiesByTask: {
             ...state.activitiesByTask,
-            [taskId]: [...newActivities, ...existingActivities].sort((a, b) => 
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            )
+            [taskId]: sorted
           },
           hasMoreByTask: {
             ...state.hasMoreByTask,

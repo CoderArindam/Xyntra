@@ -2,30 +2,27 @@ import asyncio
 import asyncpg
 import os
 import sys
+from dotenv import load_dotenv
 
-DATABASE_URL = "postgresql://postgres:Password%40123@localhost:5432/kanban_db"
+env_path = os.path.join(os.path.dirname(__file__), "..", "..", "backend", ".env")
+load_dotenv(env_path)
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:Password%40123@localhost:5432/kanban_test_db")
 MIGRATIONS_DIR = os.path.join(os.path.dirname(__file__), "..", "migrations")
-
-FILES_TO_RUN = [
-    "001_extensions.sql",
-    "002_enums.sql",
-    "003_schema_core.sql",
-    "004_indexes.sql",
-    "005_functions_authz.sql",
-    "006_functions_mutations.sql",
-    "007_triggers.sql",
-    "008_views.sql",
-    "009_seed_data.sql"
-]
 
 async def rebuild():
     conn = await asyncpg.connect(DATABASE_URL)
     
-    print("Dropping public schema...")
-    await conn.execute("DROP SCHEMA public CASCADE;")
-    await conn.execute("CREATE SCHEMA public;")
+    reset_db = "--reset" in sys.argv
+    if reset_db:
+        print("Reset flag detected. Dropping public schema...")
+        await conn.execute("DROP SCHEMA public CASCADE;")
+        await conn.execute("CREATE SCHEMA public;")
+    else:
+        print("Running migrations incrementally without dropping data...")
     
-    for filename in FILES_TO_RUN:
+    migration_files = sorted([f for f in os.listdir(MIGRATIONS_DIR) if f.endswith(".sql")])
+    for filename in migration_files:
         filepath = os.path.join(MIGRATIONS_DIR, filename)
         print(f"Executing {filename}...")
         with open(filepath, "r", encoding="utf-8") as f:

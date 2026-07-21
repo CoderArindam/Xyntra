@@ -87,9 +87,11 @@ class AuthService:
                 "session_id": session_id,
                 "message": "Registration successful"
             }
+        except asyncpg.exceptions.UniqueViolationError:
+            raise HTTPException(status_code=409, detail="This email is already registered")
         except asyncpg.exceptions.RaiseError as e:
-            if "already registered" in str(e) or "unique constraint" in str(e).lower():
-                raise HTTPException(status_code=400, detail="Email already registered")
+            if "already registered" in str(e).lower() or "unique constraint" in str(e).lower() or "unique_idx" in str(e).lower():
+                raise HTTPException(status_code=409, detail="This email is already registered")
             logger.error(f"PostgreSQL RaiseError in register_organization: {e}")
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:

@@ -22,13 +22,13 @@ import MyAccount from '../features/settings/MyAccount';
 import Security from '../features/settings/Security';
 import Organization from '../features/settings/Organization';
 import Appearance from '../features/settings/Appearance';
+import NotificationSettings from '../features/settings/NotificationSettings';
 import PlaceholderSetting from '../features/settings/PlaceholderSetting';
 
 import { ProjectSettingsLayout } from '../features/projects/ProjectSettingsLayout';
 import { ProjectSettingsPage } from '../features/projects/ProjectSettingsPage';
 
 import {
-  Bell,
   Key,
   CreditCard,
   Keyboard,
@@ -125,16 +125,7 @@ export const AppRoutes: React.FC = () => {
             <Route path="account" element={<MyAccount />} />
             <Route path="organization" element={<Organization />} />
             <Route path="appearance" element={<Appearance />} />
-            <Route
-              path="notifications"
-              element={
-                <PlaceholderSetting
-                  title="Notifications"
-                  description="Choose what we notify you about and how."
-                  Icon={Bell}
-                />
-              }
-            />
+            <Route path="notifications" element={<NotificationSettings />} />
             <Route path="security" element={<Security />} />
             <Route
               path="integrations"

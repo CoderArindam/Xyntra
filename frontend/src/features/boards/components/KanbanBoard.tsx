@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Loader2, Plus } from 'lucide-react';
 import {
   DndContext,
@@ -126,9 +127,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardId }) => {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
+  const [searchParams] = useSearchParams();
+
   useEffect(() => {
     initializeBoard(boardId);
   }, [boardId, initializeBoard]);
+
+  useEffect(() => {
+    const taskIdParam = searchParams.get('taskId');
+    if (taskIdParam && !isFetching) {
+      const taskIdNum = parseInt(taskIdParam, 10);
+      if (!isNaN(taskIdNum)) {
+        openTaskModal(taskIdNum);
+      }
+    }
+  }, [searchParams, isFetching, openTaskModal]);
 
   const handleDeleteTask = (taskId: number) => {
     setTaskToDelete(taskId);

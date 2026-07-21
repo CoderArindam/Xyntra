@@ -42,6 +42,16 @@ class InvitationService:
                 detail=f"Invalid role. Invited users must be MEMBER or MANAGER.",
             )
 
+        # Check if email belongs to an existing registered user
+        existing_user = await self.conn.fetchval(
+            "SELECT 1 FROM v_users_canonical WHERE email = $1", invite_in.email
+        )
+        if existing_user:
+            raise HTTPException(
+                status_code=400,
+                detail="This person is already a registered user"
+            )
+
         organization_id = current_user["organization_id"]
         token = secrets.token_urlsafe(32)
         expires_at = datetime.now(timezone.utc) + timedelta(hours=INVITATION_EXPIRE_HOURS)
@@ -64,6 +74,8 @@ class InvitationService:
             invitation = json.loads(result) if isinstance(result, str) else result
             return invitation, invite_in.email, org_name, token
         except asyncpg.exceptions.RaiseError as e:
+            if "already a registered user" in str(e).lower():
+                raise HTTPException(status_code=400, detail="This person is already a registered user")
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
             logger.error(f"Error creating invitation: {e}")

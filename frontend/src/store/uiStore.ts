@@ -2,8 +2,10 @@ import { create } from 'zustand';
 
 interface UiState {
   selectedTaskId: number | null;
+  highlightedCommentId: number | null;
+  activeTaskTab: 'comments' | 'attachments' | 'activity';
   isTaskModalOpen: boolean;
-  openTaskModal: (taskId: number) => void;
+  openTaskModal: (taskId: number, options?: { commentId?: number; tab?: 'comments' | 'attachments' | 'activity' }) => void;
   closeTaskModal: () => void;
   isCreateProjectModalOpen: boolean;
   openCreateProjectModal: () => void;
@@ -20,14 +22,21 @@ interface UiState {
 
 export const useUiStore = create<UiState>((set) => ({
   selectedTaskId: null,
+  highlightedCommentId: null,
+  activeTaskTab: 'comments',
   isTaskModalOpen: false,
   isCreateProjectModalOpen: false,
   isCreateTaskModalOpen: false,
   pageTitle: '',
   isSidebarCollapsed: localStorage.getItem('kanban-sidebar-collapsed') === 'true',
 
-  openTaskModal: (taskId) => set({ selectedTaskId: taskId, isTaskModalOpen: true }),
-  closeTaskModal: () => set({ selectedTaskId: null, isTaskModalOpen: false }),
+  openTaskModal: (taskId, options) => set({ 
+    selectedTaskId: taskId, 
+    highlightedCommentId: options?.commentId || null,
+    activeTaskTab: options?.tab || 'comments',
+    isTaskModalOpen: true 
+  }),
+  closeTaskModal: () => set({ selectedTaskId: null, highlightedCommentId: null, isTaskModalOpen: false }),
 
   openCreateProjectModal: () => set({ isCreateProjectModalOpen: true }),
   closeCreateProjectModal: () => set({ isCreateProjectModalOpen: false }),

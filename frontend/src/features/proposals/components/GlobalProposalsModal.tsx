@@ -13,8 +13,6 @@ import {
   Sparkles,
   X,
   RefreshCw,
-  CheckCircle,
-  AlertCircle,
   CheckCircle2,
 } from "lucide-react";
 
@@ -231,7 +229,7 @@ export const GlobalProposalsModal: React.FC<GlobalProposalsModalProps> = ({
           proposal={editingProposal}
           boards={boards}
           onClose={() => setEditingProposal(null)}
-          onSubmit={async (id, data) => {
+          onSubmit={async (_id, data) => {
             await handleUpdateAndApprove({
               ...editingProposal,
               title: data.title,

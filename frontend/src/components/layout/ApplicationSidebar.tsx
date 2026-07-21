@@ -19,6 +19,7 @@ import { useUiStore } from '../../store/uiStore';
 import WorkspaceSwitcher from '../../features/projects/components/WorkspaceSwitcher';
 import { ProjectIdentity } from '../common/ProjectIdentity';
 import UserAvatarDropdown from './UserAvatarDropdown';
+import NotificationPanel from '../../features/notifications/NotificationPanel';
 import { formatUserName } from '../../utils/userHelpers';
 
 export const ApplicationSidebar: React.FC = () => {
@@ -31,6 +32,7 @@ export const ApplicationSidebar: React.FC = () => {
   
   const [projectSearch, setProjectSearch] = useState('');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   useEffect(() => {
     fetchBoards();
@@ -178,7 +180,35 @@ export const ApplicationSidebar: React.FC = () => {
       {/* Footer / Personal */}
       <div className="p-3 border-t border-sidebar-border shrink-0">
         <div className="space-y-1 mb-4">
-          <NavItem to="/notifications" icon={Bell} label="Notifications" badge={unreadCount} />
+          <div className="relative">
+            <button
+              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                isNotificationsOpen || location.pathname.startsWith('/settings/notifications')
+                  ? 'bg-sidebar-active text-sidebar-text font-semibold' 
+                  : 'text-sidebar-text hover:bg-sidebar-active/50'
+              }`}
+              title={isSidebarCollapsed ? "Notifications" : undefined}
+            >
+              <Bell size={18} className={isNotificationsOpen ? 'text-sidebar-text' : 'text-sidebar-text-muted'} />
+              {!isSidebarCollapsed && (
+                <span className="flex-1 truncate text-left">Notifications</span>
+              )}
+              {unreadCount > 0 && (
+                <span className="bg-brand-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {isNotificationsOpen && (
+              <NotificationPanel 
+                onClose={() => setIsNotificationsOpen(false)} 
+                className="left-full bottom-0 ml-2 animate-in fade-in slide-in-from-left-2 duration-150"
+              />
+            )}
+          </div>
+
           <NavItem to="/settings/account" icon={Settings} label="Settings" />
         </div>
         

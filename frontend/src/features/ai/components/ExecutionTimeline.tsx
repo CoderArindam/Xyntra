@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { AIEvent } from '../types/ai';
-import { Loader2, CheckCircle2, XCircle, Search, Zap, Check } from 'lucide-react';
+import { Loader2, XCircle, Search, Zap, Check } from 'lucide-react';
 
 interface ExecutionTimelineProps {
   events: AIEvent[];

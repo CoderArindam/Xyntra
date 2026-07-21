@@ -263,13 +263,18 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     get()._updateTaskEntity(taskId, () => ({ column_id: newColumnId }));
     
     try {
+      const oldColName = prevTask.column_name || get().entities.columns[prevTask.column_id]?.name;
+      const newColName = get().entities.columns[newColumnId]?.name;
       useActivityStore.getState().appendActivity(taskId, {
         entity_type: 'TASK', entity_id: taskId, activity_type: 'STATUS_CHANGED',
-        old_value: { column_id: prevTask.column_id }, new_value: { column_id: newColumnId }, metadata: {}
+        old_value: { column_id: prevTask.column_id, column_name: oldColName }, 
+        new_value: { column_id: newColumnId, column_name: newColName }, 
+        metadata: {}
       });
 
       const updatedTask = await updateTaskStatus(taskId, newColumnId);
       get()._updateTaskEntity(taskId, () => updatedTask);
+      useActivityStore.getState().fetchActivity(taskId);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to move task");
       get()._updateTaskEntity(taskId, () => prevTask); // rollback
@@ -311,8 +316,21 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     get()._updateTaskEntity(taskId, () => ({ assigned_to: assigneeId || undefined }));
 
     try {
+      const oldUser = prevTask.assigned_to ? get().entities.users[prevTask.assigned_to] : null;
+      const newUser = assigneeId ? get().entities.users[assigneeId] : null;
+      const oldAssigneeName = oldUser ? (oldUser.first_name || oldUser.email) : null;
+      const newAssigneeName = newUser ? (newUser.first_name || newUser.email) : null;
+
+      useActivityStore.getState().appendActivity(taskId, {
+        entity_type: 'TASK', entity_id: taskId, activity_type: 'ASSIGNEE_CHANGED',
+        old_value: { assigned_to: prevTask.assigned_to, assignee_name: oldAssigneeName },
+        new_value: { assigned_to: assigneeId, assignee_name: newAssigneeName },
+        metadata: {}
+      });
+
       const updatedTask = await updateTaskAssignee(taskId, assigneeId);
       get()._updateTaskEntity(taskId, () => updatedTask);
+      useActivityStore.getState().fetchActivity(taskId);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update assignee");
       get()._updateTaskEntity(taskId, () => prevTask); // rollback
@@ -326,8 +344,42 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     get()._updateTaskEntity(taskId, () => data);
     
     try {
+      if (data.priority !== undefined && data.priority !== prevTask.priority) {
+        useActivityStore.getState().appendActivity(taskId, {
+          entity_type: 'TASK', entity_id: taskId, activity_type: 'PRIORITY_CHANGED',
+          old_value: { priority: prevTask.priority },
+          new_value: { priority: data.priority },
+          metadata: {}
+        });
+      }
+      if (data.due_date !== undefined && data.due_date !== prevTask.due_date) {
+        useActivityStore.getState().appendActivity(taskId, {
+          entity_type: 'TASK', entity_id: taskId, activity_type: 'DUE_DATE_CHANGED',
+          old_value: { due_date: prevTask.due_date },
+          new_value: { due_date: data.due_date },
+          metadata: {}
+        });
+      }
+      if (data.title !== undefined && data.title !== prevTask.title) {
+        useActivityStore.getState().appendActivity(taskId, {
+          entity_type: 'TASK', entity_id: taskId, activity_type: 'TITLE_CHANGED',
+          old_value: { title: prevTask.title },
+          new_value: { title: data.title },
+          metadata: {}
+        });
+      }
+      if (data.description !== undefined && data.description !== prevTask.description) {
+        useActivityStore.getState().appendActivity(taskId, {
+          entity_type: 'TASK', entity_id: taskId, activity_type: 'DESCRIPTION_CHANGED',
+          old_value: { description: prevTask.description },
+          new_value: { description: data.description },
+          metadata: {}
+        });
+      }
+
       const updatedTask = await updateTask(taskId, data);
       get()._updateTaskEntity(taskId, () => updatedTask);
+      useActivityStore.getState().fetchActivity(taskId);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update task");
       get()._updateTaskEntity(taskId, () => prevTask); // rollback
