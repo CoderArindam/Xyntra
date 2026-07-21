@@ -183,6 +183,7 @@ class CreateTaskTool(BaseTool):
     output_schema = Any
     category = "domain"
     action = "create_task"
+    required_roles = ["MANAGER", "SUPER_ADMIN"]
     risk_level = RiskLevel.SAFE
     is_write_action = True
 
@@ -238,6 +239,7 @@ class UpdateTaskTool(BaseTool):
     output_schema = Any
     category = "domain"
     action = "update_task"
+    required_roles = ["MANAGER", "SUPER_ADMIN"]
     risk_level = RiskLevel.SAFE
     is_write_action = True
 
@@ -319,6 +321,7 @@ class DeleteTaskTool(BaseTool):
     output_schema = Any
     category = "domain"
     action = "delete_task"
+    required_roles = ["MANAGER", "SUPER_ADMIN"]
     risk_level = RiskLevel.HIGH
     is_write_action = True
 
@@ -353,6 +356,7 @@ class CreateBoardTool(BaseTool):
     output_schema = Any
     category = "domain"
     action = "create_board"
+    required_roles = ["MANAGER", "SUPER_ADMIN"]
     risk_level = RiskLevel.SAFE
     is_write_action = True
 
@@ -382,6 +386,7 @@ class ArchiveBoardTool(BaseTool):
     output_schema = Any
     category = "domain"
     action = "archive_board"
+    required_roles = ["MANAGER", "SUPER_ADMIN"]
     risk_level = RiskLevel.HIGH
     is_write_action = True
 
@@ -410,6 +415,7 @@ class DeleteBoardTool(BaseTool):
     output_schema = Any
     category = "domain"
     action = "delete_board"
+    required_roles = ["MANAGER", "SUPER_ADMIN"]
     risk_level = RiskLevel.HIGH
     is_write_action = True
 

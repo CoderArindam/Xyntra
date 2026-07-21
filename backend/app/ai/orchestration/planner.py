@@ -62,7 +62,7 @@ class Planner:
                     messages=messages,
                     response_schema=ExecutionPlan,
                     org_ai_enabled=True,
-                    user_has_permission=context.current_user.get("role") in ["SUPER_ADMIN", "MANAGER"],
+                    user_has_permission=True,
                     workflow_id="planning",
                     request_id=context.request_id,
                     organization_id=context.organization_id,

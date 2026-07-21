@@ -50,8 +50,7 @@ class AIGateway:
             return ai_settings.PUTER_API_KEY
         return None
 
-    def _check_feature_flags(self, org_ai_enabled: bool, user_has_permission: bool):
-        print("user has permission", user_has_permission, "from ai_gateway.py file")
+    def _check_feature_flags(self, org_ai_enabled: bool = True, user_has_permission: bool = True):
         if not ai_settings.AI_ENABLED:
             raise AIError("AI features are globally disabled.")
         if not org_ai_enabled:
@@ -62,8 +61,8 @@ class AIGateway:
     async def execute_prompt(
         self,
         messages: List[Dict[str, Any]],
-        org_ai_enabled: bool,
-        user_has_permission: bool,
+        org_ai_enabled: bool = True,
+        user_has_permission: bool = True,
         response_schema: Optional[Type[BaseModel]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         workflow_id: Optional[str] = None,

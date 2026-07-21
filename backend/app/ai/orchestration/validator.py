@@ -34,6 +34,45 @@ MISSING_FIELD_QUESTIONS = {
     }
 }
 
+ROLES_ADMIN_MANAGER = ["SUPER_ADMIN", "MANAGER"]
+ROLES_ALL = ["SUPER_ADMIN", "MANAGER", "MEMBER"]
+
+# Per-action permission map
+ACTION_REQUIRED_ROLES: Dict[str, List[str]] = {
+    # Task Management
+    "create_task": ROLES_ADMIN_MANAGER,
+    "update_task": ROLES_ADMIN_MANAGER,
+    "delete_task": ROLES_ADMIN_MANAGER,
+    "move_task": ROLES_ADMIN_MANAGER,
+    "reassign_task": ROLES_ADMIN_MANAGER,
+    
+    # Board / Project Management
+    "create_board": ROLES_ADMIN_MANAGER,
+    "archive_board": ROLES_ADMIN_MANAGER,
+    "delete_board": ROLES_ADMIN_MANAGER,
+    "update_board_settings": ROLES_ADMIN_MANAGER,
+
+    # Self-scoped Account & Preference Management
+    "update_profile": ROLES_ALL,
+    "update_own_profile": ROLES_ALL,
+    "get_my_profile": ROLES_ALL,
+    "update_appearance": ROLES_ALL,
+    "update_preferences": ROLES_ALL,
+    "get_my_appearance": ROLES_ALL,
+
+    # Read-only Queries & Comments
+    "list_boards": ROLES_ALL,
+    "list_projects": ROLES_ALL,
+    "list_tasks": ROLES_ALL,
+    "get_task": ROLES_ALL,
+    "get_task_details": ROLES_ALL,
+    "get_workspace_users": ROLES_ALL,
+    "get_users": ROLES_ALL,
+    "get_board_summary": ROLES_ALL,
+    "add_comment": ROLES_ALL,
+    "get_comments": ROLES_ALL,
+}
+
 class PlanValidator:
     """
     Validates an ExecutionPlan before execution.
@@ -53,6 +92,8 @@ class PlanValidator:
             tool_actions = [tool.action for tool in available_tools if hasattr(tool, 'action') and tool.action]
             tool_names = [tool.name for tool in available_tools]
             
+            user_role = (context.current_user.get("role") or "MEMBER").upper()
+
             for step in plan.steps:
                 action = step.action
                 if action not in tool_actions and action not in tool_names:
@@ -64,6 +105,18 @@ class PlanValidator:
                     if tool.name == action or getattr(tool, 'action', None) == action:
                         tool_cls = tool
                         break
+                        
+                # Server-side Action Authorization / Role Gate
+                required_roles = getattr(tool_cls, 'required_roles', None) if tool_cls else None
+                if required_roles is None:
+                    required_roles = ACTION_REQUIRED_ROLES.get(action, ROLES_ALL)
+
+                if user_role not in [r.upper() for r in required_roles]:
+                    from app.ai.exceptions import PermissionError
+                    raise PermissionError(
+                        f"You do not have permission to perform action '{action}'. "
+                        f"Only {', '.join(sorted(required_roles))} can perform task and project management actions."
+                    )
                         
                 if tool_cls and hasattr(tool_cls, 'input_schema') and tool_cls.input_schema:
                     try:

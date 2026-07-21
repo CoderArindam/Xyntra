@@ -25,6 +25,8 @@ class ErrorMessageFactory:
         Derives a safe user-facing error message from an exception.
         """
         if isinstance(error, AIError):
+            if getattr(error, "message", None):
+                return error.message
             return cls._templates.get(error.category, cls._templates[FailureCategory.PERMANENT_FAILURE])
         
         # Fallback for unexpected generic exceptions

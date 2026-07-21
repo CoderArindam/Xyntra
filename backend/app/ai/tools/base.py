@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Optional, Type, List
 from pydantic import BaseModel
 import time
 from app.ai.schemas.planning import RiskLevel
@@ -21,6 +21,7 @@ class BaseTool(ABC):
     
     risk_level: RiskLevel = RiskLevel.SAFE
     action: str = ""  # The abstract action this tool fulfills (e.g., 'find_project')
+    required_roles: Optional[List[str]] = None  # List of allowed roles, e.g. ["MANAGER", "SUPER_ADMIN"]. None allows all authenticated roles.
 
     @abstractmethod
     async def execute(self, params: BaseModel, current_user: dict, services: Dict[str, Any]) -> Any:
@@ -45,6 +46,15 @@ class BaseTool(ABC):
         tracker = telemetry or tool_telemetry
         
         # [Safety Hook] Check permissions, RBAC, and Organization Policies here
+        if self.required_roles is not None:
+            user_role = (current_user.get("role") or "MEMBER").upper()
+            if user_role not in [r.upper() for r in self.required_roles]:
+                from app.ai.exceptions import PermissionError
+                raise PermissionError(
+                    f"You do not have permission to perform action '{self.action or self.name}'. "
+                    f"Only {', '.join(sorted(self.required_roles))} can perform task and project management actions."
+                )
+
         if self.is_write_action:
             # Future: Execute pre-flight check for write actions
             pass

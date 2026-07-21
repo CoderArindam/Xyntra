@@ -9,7 +9,6 @@ import {
   Play,
   Sparkles,
   ExternalLink,
-  Clock,
   Trash2,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
@@ -71,6 +70,7 @@ export const DashboardView: React.FC = () => {
   }, [fetchBoards]);
 
   useEffect(() => {
+    if (!isManagerOrAdmin) return;
     let isMounted = true;
     const fetchSessions = async () => {
       setIsLoadingSessions(true);
@@ -90,7 +90,7 @@ export const DashboardView: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isManagerOrAdmin]);
 
   const filteredActiveBoards = activeBoards.filter((board: any) =>
     board.name.toLowerCase().includes(search.toLowerCase())
@@ -135,197 +135,174 @@ export const DashboardView: React.FC = () => {
         )}
       </section>
 
-      {/* Quick Launch & Meeting Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Section 1: Start a Meeting (Role Gated) */}
-        {isManagerOrAdmin ? (
-          <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex flex-col justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
-                <Video className="w-5 h-5" />
+      {/* Quick Launch & Meeting Controls (Manager/Admin Only) */}
+      {isManagerOrAdmin && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Section 1: Start a Meeting */}
+            <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex flex-col justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
+                  <Video className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-brand-text">Start a Meeting</h3>
+                  <p className="text-xs text-brand-text-muted">Launch bot to extract tasks</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-brand-text">Start a Meeting</h3>
-                <p className="text-xs text-brand-text-muted">Launch bot to extract tasks</p>
-              </div>
+              <p className="text-xs text-brand-text-muted leading-relaxed">
+                Connect KAIO bot to your live Google Meet URL. Extracted action items will appear in the review queue.
+              </p>
+              <button
+                onClick={() => setIsJoinModalOpen(true)}
+                className="w-full py-2 px-3 text-xs font-semibold bg-brand-surface-low border border-brand-border hover:bg-brand-surface-hover rounded-lg text-brand-text flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <Play className="w-3.5 h-3.5 fill-current text-brand-primary" /> Open Join Dialog
+              </button>
             </div>
-            <p className="text-xs text-brand-text-muted leading-relaxed">
-              Connect KAIO bot to your live Google Meet URL. Extracted action items will appear in the review queue.
-            </p>
-            <button
-              onClick={() => setIsJoinModalOpen(true)}
-              className="w-full py-2 px-3 text-xs font-semibold bg-brand-surface-low border border-brand-border hover:bg-brand-surface-hover rounded-lg text-brand-text flex items-center justify-center gap-2 transition-colors"
-            >
-              <Play className="w-3.5 h-3.5 fill-current text-brand-primary" /> Open Join Dialog
-            </button>
-          </div>
-        ) : (
-          <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex flex-col justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-brand-surface-low border border-brand-border flex items-center justify-center text-brand-text-muted shrink-0">
-                <Video className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-brand-text">Meeting AI Assistant</h3>
-                <p className="text-xs text-brand-text-muted">Member view</p>
-              </div>
-            </div>
-            <p className="text-xs text-brand-text-muted leading-relaxed">
-              Meeting initiation is managed by managers and admins. You will see approved tasks on your Kanban boards.
-            </p>
-          </div>
-        )}
 
-        {/* Section 2: Google Calendar Integration (Placeholder) */}
-        <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex flex-col justify-between gap-4 opacity-75">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
-                <Calendar className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-brand-text">Google Calendar</h3>
-                <p className="text-xs text-brand-text-muted">Auto-sync scheduled meetings</p>
-              </div>
-            </div>
-            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
-              Coming Soon
-            </span>
-          </div>
-          <p className="text-xs text-brand-text-muted leading-relaxed">
-            Automatically trigger meeting recording and task extraction for events on your Google Calendar.
-          </p>
-          <button
-            disabled
-            className="w-full py-2 px-3 text-xs font-semibold bg-brand-surface-low border border-brand-border text-brand-text-muted rounded-lg cursor-not-allowed opacity-60 flex items-center justify-center gap-2"
-          >
-            <Calendar className="w-3.5 h-3.5" /> Connect Google Calendar
-          </button>
-        </div>
-
-        {/* Section 3: Proposal Review Shortcut */}
-        <div
-          onClick={() => isManagerOrAdmin && setIsProposalsModalOpen(true)}
-          className={`bg-brand-surface border border-brand-border rounded-2xl p-6 flex flex-col justify-between gap-4 transition-all ${
-            isManagerOrAdmin ? 'hover:border-emerald-500/50 cursor-pointer shadow-xs hover:shadow-md' : 'opacity-85'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-brand-text">AI Task Proposals</h3>
-                <p className="text-xs text-brand-text-muted">Review & Approve</p>
-              </div>
-            </div>
-            {isManagerOrAdmin && pendingProposalsCount > 0 && (
-              <span className="px-2.5 py-1 text-[11px] font-bold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse">
-                {pendingProposalsCount} Pending
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-brand-text-muted leading-relaxed">
-            Pending action items extracted from completed meetings are waiting for board assignment and manager approval.
-          </p>
-          {isManagerOrAdmin ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsProposalsModalOpen(true);
-              }}
-              className="w-full py-2 px-3 text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" /> Review Proposals ({pendingProposalsCount})
-            </button>
-          ) : (
-            <div className="text-xs text-brand-text-muted flex items-center gap-1 font-medium">
-              <Clock className="w-3.5 h-3.5 text-emerald-400" /> Automated task creation enabled
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Recent Meetings Section */}
-      <section className="bg-brand-surface border border-brand-border rounded-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-brand-text flex items-center gap-2">
-            <Video className="w-4 h-4 text-brand-primary" /> Recent Meeting Sessions
-          </h2>
-          <span className="text-xs text-brand-text-muted">
-            {recentSessions.length} session{recentSessions.length !== 1 ? 's' : ''} recorded
-          </span>
-        </div>
-
-        {isLoadingSessions ? (
-          <div className="py-8 text-center text-xs text-brand-text-muted flex items-center justify-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin text-brand-primary" /> Loading recent sessions...
-          </div>
-        ) : recentSessions.length === 0 ? (
-          <div className="py-8 text-center text-xs text-brand-text-muted border border-dashed border-brand-border rounded-xl">
-            No meeting sessions recorded yet for this organization.
-          </div>
-        ) : (
-          <div className="divide-y divide-brand-border/60 border border-brand-border rounded-xl overflow-hidden">
-            {recentSessions.slice(0, 10).map((session) => {
-              const displayTitle = session.meeting_url?.trim() || `Google Meet Session (${(session.session_id || session.id || '').substring(0, 8)})`;
-              const targetUrl = session.meeting_url?.trim() || '#';
-
-              return (
-                <div
-                  key={session.id}
-                  className="p-3.5 flex items-center justify-between gap-4 hover:bg-brand-surface-low/50 transition-colors text-xs"
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase shrink-0 ${
-                        session.source === 'google_calendar'
-                          ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-                          : 'bg-brand-primary/10 text-brand-primary border border-brand-primary/20'
-                      }`}
-                    >
-                      {session.source === 'google_calendar' ? 'Calendar' : 'Manual'}
-                    </span>
-
-                    {session.meeting_url ? (
-                      <a
-                        href={targetUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-mono text-brand-text hover:text-brand-primary truncate flex items-center gap-1 font-medium"
-                      >
-                        {displayTitle} <ExternalLink className="w-3 h-3 shrink-0" />
-                      </a>
-                    ) : (
-                      <span className="font-mono text-brand-text font-medium truncate">
-                        {displayTitle}
-                      </span>
-                    )}
+            {/* Section 2: Google Calendar Integration (Placeholder) */}
+            <div className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex flex-col justify-between gap-4 opacity-75">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
+                    <Calendar className="w-5 h-5" />
                   </div>
-
-                  <div className="flex items-center gap-3 shrink-0 text-brand-text-muted">
-                    <span className="capitalize px-2 py-0.5 rounded-md bg-brand-surface-low border border-brand-border text-brand-text">
-                      {session.status}
-                    </span>
-                    <span>{new Date(session.created_at).toLocaleDateString()}</span>
-
-                    {isManagerOrAdmin && (
-                      <button
-                        onClick={() => handleDeleteSession(session.id || session.session_id)}
-                        className="p-1.5 text-brand-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                        title="Delete Meeting Record"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                  <div>
+                    <h3 className="text-sm font-bold text-brand-text">Google Calendar</h3>
+                    <p className="text-xs text-brand-text-muted">Auto-sync scheduled meetings</p>
                   </div>
                 </div>
-              );
-            })}
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                  Coming Soon
+                </span>
+              </div>
+              <p className="text-xs text-brand-text-muted leading-relaxed">
+                Automatically trigger meeting recording and task extraction for events on your Google Calendar.
+              </p>
+              <button
+                disabled
+                className="w-full py-2 px-3 text-xs font-semibold bg-brand-surface-low border border-brand-border text-brand-text-muted rounded-lg cursor-not-allowed opacity-60 flex items-center justify-center gap-2"
+              >
+                <Calendar className="w-3.5 h-3.5" /> Connect Google Calendar
+              </button>
+            </div>
+
+            {/* Section 3: Proposal Review Shortcut */}
+            <div
+              onClick={() => setIsProposalsModalOpen(true)}
+              className="bg-brand-surface border border-brand-border rounded-2xl p-6 flex flex-col justify-between gap-4 hover:border-emerald-500/50 cursor-pointer shadow-xs hover:shadow-md transition-all"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-brand-text">AI Task Proposals</h3>
+                    <p className="text-xs text-brand-text-muted">Review & Approve</p>
+                  </div>
+                </div>
+                {pendingProposalsCount > 0 && (
+                  <span className="px-2.5 py-1 text-[11px] font-bold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse">
+                    {pendingProposalsCount} Pending
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-brand-text-muted leading-relaxed">
+                Pending action items extracted from completed meetings are waiting for board assignment and manager approval.
+              </p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsProposalsModalOpen(true);
+                }}
+                className="w-full py-2 px-3 text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Review Proposals ({pendingProposalsCount})
+              </button>
+            </div>
           </div>
-        )}
-      </section>
+
+          {/* Recent Meetings Section */}
+          <section className="bg-brand-surface border border-brand-border rounded-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-brand-text flex items-center gap-2">
+                <Video className="w-4 h-4 text-brand-primary" /> Recent Meeting Sessions
+              </h2>
+              <span className="text-xs text-brand-text-muted">
+                {recentSessions.length} session{recentSessions.length !== 1 ? 's' : ''} recorded
+              </span>
+            </div>
+
+            {isLoadingSessions ? (
+              <div className="py-8 text-center text-xs text-brand-text-muted flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-brand-primary" /> Loading recent sessions...
+              </div>
+            ) : recentSessions.length === 0 ? (
+              <div className="py-8 text-center text-xs text-brand-text-muted border border-dashed border-brand-border rounded-xl">
+                No meeting sessions recorded yet for this organization.
+              </div>
+            ) : (
+              <div className="divide-y divide-brand-border/60 border border-brand-border rounded-xl overflow-hidden">
+                {recentSessions.slice(0, 10).map((session) => {
+                  const displayTitle = session.meeting_url?.trim() || `Google Meet Session (${(session.session_id || session.id || '').substring(0, 8)})`;
+                  const targetUrl = session.meeting_url?.trim() || '#';
+
+                  return (
+                    <div
+                      key={session.id}
+                      className="p-3.5 flex items-center justify-between gap-4 hover:bg-brand-surface-low/50 transition-colors text-xs"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase shrink-0 ${
+                            session.source === 'google_calendar'
+                              ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                              : 'bg-brand-primary/10 text-brand-primary border border-brand-primary/20'
+                          }`}
+                        >
+                          {session.source === 'google_calendar' ? 'Calendar' : 'Manual'}
+                        </span>
+
+                        {session.meeting_url ? (
+                          <a
+                            href={targetUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-mono text-brand-text hover:text-brand-primary truncate flex items-center gap-1 font-medium"
+                          >
+                            {displayTitle} <ExternalLink className="w-3 h-3 shrink-0" />
+                          </a>
+                        ) : (
+                          <span className="font-mono text-brand-text font-medium truncate">
+                            {displayTitle}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0 text-brand-text-muted">
+                        <span className="capitalize px-2 py-0.5 rounded-md bg-brand-surface-low border border-brand-border text-brand-text">
+                          {session.status}
+                        </span>
+                        <span>{new Date(session.created_at).toLocaleDateString()}</span>
+
+                        <button
+                          onClick={() => handleDeleteSession(session.id || session.session_id)}
+                          className="p-1.5 text-brand-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Meeting Record"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
       {/* Projects Search & Controls Header */}
       <section className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-4 border-t border-brand-border">

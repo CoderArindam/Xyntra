@@ -18,7 +18,7 @@ class ClarificationRouter:
     def __init__(self, gateway: AIGateway):
         self.gateway = gateway
 
-    async def resolve(self, user_input: str, pending_plan: ExecutionPlan, missing_fields: list[str], request_id: str, organization_id: str, user_id: str, user_has_permission: bool = False) -> ClarificationDecision:
+    async def resolve(self, user_input: str, pending_plan: ExecutionPlan, missing_fields: list[str], request_id: str, organization_id: str, user_id: str, user_has_permission: bool = True) -> ClarificationDecision:
         with Span("Resolve Clarification", "ClarificationRouter") as span:
             system_prompt = f"""You are routing a user's response to a pending clarification question.
 
