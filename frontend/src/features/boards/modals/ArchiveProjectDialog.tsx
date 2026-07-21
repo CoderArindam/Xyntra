@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Archive, AlertTriangle, X } from 'lucide-react';
 import { useProjectSettingsStore } from '../../../store/projectSettingsStore';
 import { useNavigate } from 'react-router-dom';
@@ -31,9 +32,9 @@ export const ArchiveProjectDialog: React.FC<ArchiveProjectDialogProps> = ({
     navigate("/dashboard"); // Redirect to dashboard
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-brand-surface border border-brand-border rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+  return createPortal(
+    <div className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-brand-surface border border-brand-border rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] z-[var(--z-modal)]">
         {/* Header */}
         <div className="px-6 py-4 border-b border-brand-border flex items-center justify-between sticky top-0 bg-brand-surface z-10">
           <div className="flex items-center gap-3 text-red-600 dark:text-red-500">
@@ -94,6 +95,7 @@ export const ArchiveProjectDialog: React.FC<ArchiveProjectDialogProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

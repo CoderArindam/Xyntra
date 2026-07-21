@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   listOrgProposals,
   approveProposal,
@@ -115,9 +116,9 @@ export const GlobalProposalsModal: React.FC<GlobalProposalsModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-brand-bg border border-brand-border rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+  return createPortal(
+    <div className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+      <div className="bg-brand-bg border border-brand-border rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden relative z-[var(--z-modal)]">
         {/* Header */}
         <div className="p-6 border-b border-brand-border flex items-center justify-between bg-brand-surface shrink-0">
           <div className="flex items-center gap-3">
@@ -242,7 +243,8 @@ export const GlobalProposalsModal: React.FC<GlobalProposalsModalProps> = ({
           }}
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
 

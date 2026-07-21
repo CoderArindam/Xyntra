@@ -29,8 +29,10 @@ export const joinMeeting = async (
   return response.data;
 };
 
-export const listRecentMeetingSessions = async (): Promise<MeetingSession[]> => {
-  const response = await api.get('/meeting/sessions');
+export const listRecentMeetingSessions = async (limit?: number): Promise<MeetingSession[]> => {
+  const response = await api.get('/meeting/sessions', {
+    params: limit ? { limit } : undefined,
+  });
   return response.data.data;
 };
 

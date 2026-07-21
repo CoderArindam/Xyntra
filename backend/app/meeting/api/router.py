@@ -14,8 +14,9 @@ All responses are machine-friendly with explicit state and message fields.
 
 from __future__ import annotations
 
+from typing import Optional
 import asyncpg
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Query
 
 from app.meeting.logger import get_logger
 from app.meeting.schemas.meeting import (
@@ -128,20 +129,24 @@ async def join_meeting(
 
 @router.get("/sessions")
 async def list_meeting_sessions(
+    limit: Optional[int] = Query(None, ge=1, le=100, description="Optional maximum number of meeting sessions to return"),
     current_user: dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db_connection)
 ):
     """Lists historical meeting sessions for the caller's organization using direct org_id column."""
     org_id = current_user["organization_id"]
 
-    rows = await conn.fetch(
-        """
+    query = """
         SELECT * FROM v_meeting_sessions_canonical
         WHERE org_id = $1
         ORDER BY created_at DESC
-        """,
-        org_id
-    )
+    """
+    args = [org_id]
+    if limit is not None:
+        query += " LIMIT $2"
+        args.append(limit)
+
+    rows = await conn.fetch(query, *args)
 
     return DataEnvelope(data=[dict(r) for r in rows])
 

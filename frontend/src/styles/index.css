@@ -39,8 +39,8 @@
 
   /* Z-index Management */
   --z-header: 40;
-  --z-overlay: 50;
-  --z-modal: 60;
+  --z-overlay: 60;
+  --z-modal: 70;
   --z-toast: 9999;
 
   /* Animations */
