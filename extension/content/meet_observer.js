@@ -25,31 +25,23 @@ class MeetObserver {
   }
 
   findAndObserveContainer() {
-    console.log("KAIO [FORENSIC]: findAndObserveContainer() interval running...");
     // Periodically check if container exists or was rebuilt
     this.containerSearchInterval = setInterval(() => {
       const container = this.adapter.getParticipantListContainer();
-      console.log("KAIO [FORENSIC]: getParticipantListContainer() returned:", container ? container.tagName : "null");
       
       if (container && !this.observer) {
-        console.log("KAIO [FORENSIC]: Target node found. Attaching observer...");
         this.attachObserver(container);
         this.fullSync(container);
       } else if (!container && this.observer) {
         // Container lost (Meet rebuilt UI or panel closed)
         this.observer.disconnect();
         this.observer = null;
-        console.log("KAIO [FORENSIC]: Participant container lost, waiting for it to return...");
-      } else if (!container) {
-        console.log("KAIO [FORENSIC]: Target node is STILL NULL. Sidebar is likely closed. Waiting...");
       }
     }, 2000);
   }
 
   attachObserver(container) {
-    console.log("KAIO [FORENSIC]: attachObserver() called on container:", container);
     this.observer = new MutationObserver((mutations) => {
-      console.log("KAIO [FORENSIC]: MutationObserver callback fired! Mutations count:", mutations.length);
       this.handleMutations(mutations, container);
     });
     
@@ -58,7 +50,6 @@ class MeetObserver {
       subtree: true,
       characterData: true
     });
-    console.log("KAIO [FORENSIC]: MutationObserver successfully attached to container.");
   }
 
   fullSync(container) {
@@ -120,7 +111,7 @@ class MeetObserver {
             const info = this.adapter.extractParticipantInfo(node);
             if (info && this.currentParticipants.has(info.id)) {
               this.currentParticipants.delete(info.id);
-              this.emitEvent("ParticipantLeft", { participant_id: info.id });
+              this.emitEvent("ParticipantLeft", { participant_id: id });
             }
           } else {
             needsSync = true;
@@ -155,8 +146,6 @@ class MeetObserver {
     payload.session_id = this.sessionId;
     payload.timestamp = new Date().toISOString();
     
-    console.log(`KAIO [FORENSIC]: Emitting event ${eventType}:`, payload);
-    
     chrome.runtime.sendMessage({
       type: "PRESENCE_EVENT",
       payload: {
@@ -181,10 +170,4 @@ observer.start();
 chrome.runtime.sendMessage({
   type: "CONTENT_SCRIPT_READY",
   payload: { session_id: observer.sessionId }
-}, (response) => {
-  if (chrome.runtime.lastError) {
-    console.error("KAIO: Failed to notify service worker:", chrome.runtime.lastError);
-  } else {
-    console.log("KAIO: Service worker acknowledged content script ready.");
-  }
 });

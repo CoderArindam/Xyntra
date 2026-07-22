@@ -52,7 +52,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         url: sender.tab.url,
         timestamp: Date.now()
       };
-      console.log(`KAIO: Content script ready on tab ${sender.tab.id} for session ${message.payload.session_id}`);
       sendResponse({ status: "ACK" });
     }
   }
@@ -82,16 +81,13 @@ async function registerWithBackend() {
       const data = await response.json();
       extensionId = data.extension_id;
       isRegistered = true;
-      console.log("Registered with backend:", data);
       
       // Flush any queued events
       flushQueue();
     } else {
-      console.error("Registration failed:", response.status);
       isRegistered = false;
     }
   } catch (error) {
-    console.error("Registration network error:", error);
     isRegistered = false;
     // Retry registration later
     setTimeout(registerWithBackend, 5000);
@@ -153,15 +149,12 @@ async function flushQueue() {
         eventQueue = eventQueue.filter(e => e.id !== item.id);
         saveQueue();
       } else if (response.status === 401 || response.status === 403) {
-        console.error("Unauthorized, stopping flush.");
         isRegistered = false;
         break; // Stop flushing, we need to re-auth
       } else {
-        console.warn("Failed to send event, status:", response.status);
         break; // Stop flushing on error, will retry later
       }
     } catch (error) {
-      console.error("Network error during flush:", error);
       break; // Stop flushing, wait for network recovery
     }
   }

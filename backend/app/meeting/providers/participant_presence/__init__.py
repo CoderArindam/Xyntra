@@ -1,6 +1,6 @@
 from app.meeting.contracts.participant_presence_provider import ParticipantPresenceProvider
 from app.meeting.config import meeting_config
-from app.meeting.legacy.json_provider import JsonPresenceProvider
+from .json_provider import JsonPresenceProvider
 from .external_provider import ExternalPresenceProvider
 from .registry import presence_registry, PresenceProviderRegistry
 

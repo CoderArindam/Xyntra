@@ -7,7 +7,6 @@ warnings.filterwarnings("ignore", message=".*torchcodec.*")
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-import os
 from pathlib import Path
 from app.database.connection import db
 from app.routers import auth, boards, tasks, users, comments, attachments, activity, board_members, admin, invitations, notifications, my_work, preferences, organization, ai, task_proposals, dashboard

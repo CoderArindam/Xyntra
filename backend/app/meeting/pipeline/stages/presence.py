@@ -39,7 +39,7 @@ class PresenceCollectionStage(PipelineStage):
         return False
 
     async def execute(self, context: PipelineContext) -> StageStatus:
-        from app.meeting.legacy.json_provider import JsonPresenceProvider
+        from app.meeting.providers.participant_presence.json_provider import JsonPresenceProvider
         from app.meeting.config import meeting_config
         from pathlib import Path
         
