@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, UserPlus } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -18,11 +18,13 @@ import { useAuthStore } from '../../../store/authStore';
 import TaskCard from './TaskCard';
 import TaskDetailsModal from '../modals/task-details';
 import CreateTaskModal from '../modals/CreateTaskModal';
+import AddMemberModal from '../modals/AddMemberModal';
 import AssigneeFilter from './AssigneeFilter';
 import DueDateFilter, { type DueDateFilterOption } from './DueDateFilter';
 import { type Column, type Task } from '../../../services/tasksApi';
 import { type User } from '../../../services/usersApi';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+
 interface KanbanBoardProps {
   boardId: number;
 }
@@ -122,6 +124,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardId }) => {
     useState<DueDateFilterOption>("All");
   const [taskToDelete, setTaskToDelete] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -180,7 +183,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardId }) => {
     }
 
     if (targetColumnId !== null && task.column_id !== targetColumnId) {
-      // Opt UI
       task.column_id = targetColumnId;
     }
   };
@@ -210,6 +212,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardId }) => {
     await moveTask(task.id, targetColumnId);
   };
 
+  const isManagerOrAdmin = ['SUPER_ADMIN', 'MANAGER'].includes((user?.role || '').toUpperCase());
+
   return (
     <DndContext
       sensors={sensors}
@@ -223,10 +227,22 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardId }) => {
             Kanban
           </h1>
 
-          <div className="flex gap-3">
-            <button className="px-4 py-2 rounded-full border border-brand-border bg-brand-surface text-sm">
-              Invite
-            </button>
+          <div className="flex gap-3 items-center">
+            {isManagerOrAdmin ? (
+              <button
+                onClick={() => setIsAddMemberModalOpen(true)}
+                className="bg-brand-primary hover:bg-brand-primary-hover text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer focus:ring-2 focus:ring-brand-primary focus:outline-none"
+              >
+                <UserPlus className="w-4 h-4" /> Add Member
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsAddMemberModalOpen(true)}
+                className="px-4 py-2 rounded-full border border-brand-border bg-brand-surface text-sm font-medium hover:bg-brand-surface-low transition-colors cursor-pointer"
+              >
+                Board Members
+              </button>
+            )}
           </div>
         </header>
 
@@ -368,7 +384,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardId }) => {
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
             <button
               onClick={openCreateTaskModal}
-              className="bg-brand-primary hover:bg-brand-primary-hover text-white shadow-xl shadow-brand-primary/20 px-6 py-3 rounded-full font-medium flex items-center gap-2 transition"
+              className="bg-brand-primary hover:bg-brand-primary-hover text-white shadow-xl shadow-brand-primary/20 px-6 py-3 rounded-full font-medium flex items-center gap-2 transition cursor-pointer"
             >
               <Plus size={18} />
               Create Task
@@ -377,7 +393,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardId }) => {
         )}
       </div>
 
-      {/* Drag overlay - renders the ghost while dragging */}
+      {/* Drag overlay */}
       <DragOverlay>
         {activeTask && (
           <div style={{ opacity: 0.9, cursor: "grabbing" }}>
@@ -402,6 +418,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardId }) => {
 
       <TaskDetailsModal />
       <CreateTaskModal />
+      <AddMemberModal
+        isOpen={isAddMemberModalOpen}
+        onClose={() => setIsAddMemberModalOpen(false)}
+        boardId={boardId}
+        onMemberAdded={() => initializeBoard(boardId)}
+      />
 
       <ConfirmDialog
         isOpen={taskToDelete !== null}

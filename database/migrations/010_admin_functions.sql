@@ -104,8 +104,15 @@ CREATE OR REPLACE FUNCTION remove_user_from_board(
 )
 RETURNS BOOLEAN AS $$
 DECLARE
+    v_target_role role_enum;
     v_deleted INTEGER;
 BEGIN
+    SELECT role INTO v_target_role FROM users WHERE id = p_user_id AND deleted_at IS NULL;
+
+    IF v_target_role = 'SUPER_ADMIN' THEN
+        RAISE EXCEPTION 'Cannot remove Super Admin from board';
+    END IF;
+
     DELETE FROM board_members 
     WHERE board_id = p_board_id AND user_id = p_user_id;
     

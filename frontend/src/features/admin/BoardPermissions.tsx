@@ -267,14 +267,20 @@ const BoardPermissions: React.FC = () => {
                           </td>
                           <td className="px-8 py-4 text-center">
                             <div className="flex justify-center">
-                              <button
-                                onClick={() => handleRemove(member.id)}
-                                disabled={isRemovingUser}
-                                className="p-2 text-brand-text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-brand-text-muted"
-                                title="Revoke access"
-                              >
-                                <Trash2 size={18} />
-                              </button>
+                              {member.role === "SUPER_ADMIN" ? (
+                                <span className="text-xs px-2.5 py-1 rounded-full bg-brand-surface-low text-brand-text-muted font-medium border border-brand-border" title="Super Admins cannot be removed from project permissions">
+                                  Protected
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleRemove(member.id)}
+                                  disabled={isRemovingUser}
+                                  className="p-2 text-brand-text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-brand-text-muted cursor-pointer"
+                                  title="Revoke access"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

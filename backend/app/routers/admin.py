@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, status
 
 from app.schemas.admin import UserCreateAdmin, UserRoleUpdate, AdminUserResponse, AdminBoardResponse, BoardMemberAssign, AdminBoardMemberResponse
-from app.auth.permissions import require_super_admin
+from app.auth.permissions import require_super_admin, require_manager_or_above
 from app.database.connection import get_db_connection
 from app.services.admin_service import AdminService
 
@@ -59,7 +59,7 @@ async def get_all_boards(
 async def assign_user(
     board_id: int,
     assign_in: BoardMemberAssign,
-    current_user: dict = Depends(require_super_admin),
+    current_user: dict = Depends(require_manager_or_above),
     admin_service: AdminService = Depends(get_admin_service)
 ):
     await admin_service.assign_user(board_id, assign_in, current_user)

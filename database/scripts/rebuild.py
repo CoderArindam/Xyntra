@@ -17,7 +17,7 @@ async def rebuild():
     if reset_db:
         print("Reset flag detected. Dropping public schema...")
 
-        await conn.execute("CREATE SCHEMA public;")
+        await conn.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
     else:
         print("Running migrations incrementally without dropping data...")
     

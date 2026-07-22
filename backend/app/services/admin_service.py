@@ -127,6 +127,8 @@ class AdminService:
             )
             if not result:
                 raise HTTPException(status_code=404, detail="User not found on this board")
+        except asyncpg.exceptions.RaiseError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
             logger.error(f"Error removing user from board: {e}")
             raise HTTPException(status_code=500, detail="An unexpected error occurred")
