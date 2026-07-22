@@ -11,7 +11,7 @@ import {
   adminAssignUser, 
   adminRemoveUser 
 } from '../services/adminApi';
-import { adminInviteUser, adminListInvitations, type Invitation } from '../services/invitationsApi';
+import { adminInviteUser, adminListInvitations, adminRevokeInvitation, type Invitation } from '../services/invitationsApi';
 import toast from 'react-hot-toast';
 
 interface AdminState {
@@ -25,6 +25,7 @@ interface AdminState {
   isInvitingUser: boolean;
   isUpdatingRole: boolean;
   isDeletingUser: boolean;
+  isRevokingInvitation: boolean;
   
   isFetchingBoards: boolean;
   isFetchingMembers: boolean;
@@ -34,6 +35,7 @@ interface AdminState {
   fetchUsers: () => Promise<void>;
   fetchInvitations: () => Promise<void>;
   inviteUser: (email: string, role: string) => Promise<void>;
+  revokeInvitation: (invitationId: number) => Promise<void>;
   updateUserRole: (userId: number, role: string) => Promise<void>;
   deleteUser: (userId: number) => Promise<void>;
 
@@ -110,6 +112,21 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       }
     } finally {
       set({ isInvitingUser: false });
+    }
+  },
+
+  revokeInvitation: async (invitationId) => {
+    set({ isRevokingInvitation: true });
+    try {
+      await adminRevokeInvitation(invitationId);
+      set((state) => ({
+        invitations: state.invitations.filter((i) => i.id !== invitationId),
+      }));
+      toast.success('Invitation revoked successfully');
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to revoke invitation');
+    } finally {
+      set({ isRevokingInvitation: false });
     }
   },
 

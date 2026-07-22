@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAdminStore } from '../../store/adminStore';
 import { useAuthStore } from '../../store/authStore';
-import { Trash2, Loader2, X, AlertTriangle, Users, Mail } from 'lucide-react';
+import { Trash2, Loader2, X, AlertTriangle, Users, Mail, UserX } from 'lucide-react';
 import { UserAvatar } from '../../components/common/UserAvatar';
 import { formatUserName } from '../../utils/userHelpers';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -17,7 +17,9 @@ const UsersManagement: React.FC = () => {
     isFetchingUsers, 
     isFetchingInvitations,
     inviteUser, 
+    revokeInvitation,
     isInvitingUser, 
+    isRevokingInvitation,
     updateUserRole, 
     deleteUser 
   } = useAdminStore();
@@ -33,6 +35,7 @@ const UsersManagement: React.FC = () => {
   const [inviteError, setInviteError] = useState<string | null>(null);
   
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
+  const [invitationToRevoke, setInvitationToRevoke] = useState<{ id: number; email: string } | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -68,6 +71,12 @@ const UsersManagement: React.FC = () => {
     setUserToDelete(null);
   };
 
+  const confirmRevokeInvitation = async () => {
+    if (!invitationToRevoke) return;
+    await revokeInvitation(invitationToRevoke.id);
+    setInvitationToRevoke(null);
+  };
+
   return (
     <div className="flex flex-col h-full gap-6 overflow-y-auto pb-8">
       <header className="flex items-center justify-between">
@@ -77,7 +86,7 @@ const UsersManagement: React.FC = () => {
         </div>
         <button
           onClick={() => setIsInviteModalOpen(true)}
-          className="bg-brand-primary hover:bg-brand-primary-hover text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition"
+          className="bg-brand-primary hover:bg-brand-primary-hover text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition cursor-pointer"
         >
           <Mail size={16} />
           Invite User
@@ -146,7 +155,7 @@ const UsersManagement: React.FC = () => {
                           <button
                             onClick={() => setUserToDelete(u.id)}
                             disabled={u.id === currentUser?.id}
-                            className="p-2 text-brand-text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-brand-text-muted"
+                            className="p-2 text-brand-text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-brand-text-muted cursor-pointer"
                             title={u.id === currentUser?.id ? "Cannot delete yourself" : "Delete user"}
                           >
                             <Trash2 size={18} />
@@ -174,19 +183,20 @@ const UsersManagement: React.FC = () => {
                   <th className="px-6 py-4">Role</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4">Sent At</th>
+                  <th className="px-6 py-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-border">
                 {isFetchingInvitations ? (
                   <tr>
-                    <td colSpan={4} className="p-12 text-center text-brand-text-muted">
+                    <td colSpan={5} className="p-12 text-center text-brand-text-muted">
                       <Loader2 className="animate-spin mx-auto mb-2" size={24} />
                       <p className="text-sm">Loading invitations...</p>
                     </td>
                   </tr>
                 ) : invitations.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="p-12 text-center text-brand-text-muted">
+                    <td colSpan={5} className="p-12 text-center text-brand-text-muted">
                       <Mail className="mx-auto mb-3 opacity-20" size={48} />
                       <p>No invitations found.</p>
                     </td>
@@ -213,12 +223,25 @@ const UsersManagement: React.FC = () => {
                           </span>
                         ) : (
                           <span className="text-xs font-semibold px-3 py-1.5 rounded-full border bg-red-500/10 text-red-500 border-red-500/20">
-                            Expired
+                            Expired / Revoked
                           </span>
                         )}
                       </td>
                       <td className="px-6 py-4 text-brand-text-muted text-sm">
                         {new Date(inv.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {inv.is_pending ? (
+                          <button
+                            onClick={() => setInvitationToRevoke({ id: inv.id, email: inv.email })}
+                            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20 transition-colors cursor-pointer flex items-center gap-1 mx-auto"
+                            title="Revoke invitation link"
+                          >
+                            <UserX size={14} /> Revoke
+                          </button>
+                        ) : (
+                          <span className="text-xs text-brand-text-muted italic">—</span>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -238,7 +261,7 @@ const UsersManagement: React.FC = () => {
               <h2 className="text-xl font-bold text-brand-text">Invite User</h2>
               <button 
                 onClick={closeInviteModal}
-                className="text-brand-text-muted hover:text-brand-text bg-brand-surface-low hover:bg-brand-border p-2 rounded-full transition-colors"
+                className="text-brand-text-muted hover:text-brand-text bg-brand-surface-low hover:bg-brand-border p-2 rounded-full transition-colors cursor-pointer"
               >
                 <X size={20} />
               </button>
@@ -280,7 +303,7 @@ const UsersManagement: React.FC = () => {
                 <select
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
-                  className="bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-brand-text text-sm outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-shadow appearance-none"
+                  className="bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-brand-text text-sm outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-shadow appearance-none cursor-pointer"
                 >
                   <option value="MEMBER" className="text-black">Member</option>
                   <option value="MANAGER" className="text-black">Manager</option>
@@ -308,14 +331,14 @@ const UsersManagement: React.FC = () => {
                 <button
                   type="button"
                   onClick={closeInviteModal}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium text-brand-text-muted hover:text-brand-text hover:bg-brand-surface-low transition-colors"
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium text-brand-text-muted hover:text-brand-text hover:bg-brand-surface-low transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isInvitingUser || !newEmail}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium bg-brand-primary hover:bg-brand-primary-hover text-white transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium bg-brand-primary hover:bg-brand-primary-hover text-white transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm cursor-pointer"
                 >
                   {isInvitingUser ? <Loader2 size={16} className="animate-spin" /> : null}
                   Send Invitation
@@ -326,7 +349,40 @@ const UsersManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Confirmation */}
+      {/* Revoke Invitation Modal */}
+      {invitationToRevoke && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setInvitationToRevoke(null)} />
+          <div className="bg-brand-surface border border-brand-border rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center flex flex-col items-center relative z-10 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mb-5 ring-4 ring-red-500/5">
+              <UserX size={28} />
+            </div>
+            <h2 className="text-xl font-bold text-brand-text mb-2">Revoke Invitation?</h2>
+            <p className="text-sm text-brand-text-muted mb-8 leading-relaxed">
+              Are you sure you want to revoke the pending invitation for <span className="font-semibold text-brand-text">{invitationToRevoke.email}</span>? The invitation token will be permanently deleted and the user will not be able to activate an account with that link.
+            </p>
+            <div className="flex w-full gap-3">
+              <button
+                onClick={() => setInvitationToRevoke(null)}
+                disabled={isRevokingInvitation}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-brand-border text-sm font-medium hover:bg-brand-surface-low transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRevokeInvitation}
+                disabled={isRevokingInvitation}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isRevokingInvitation ? <Loader2 size={16} className="animate-spin" /> : null}
+                Revoke Invitation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation */}
       {userToDelete && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setUserToDelete(null)} />
@@ -341,13 +397,13 @@ const UsersManagement: React.FC = () => {
             <div className="flex w-full gap-3">
               <button
                 onClick={() => setUserToDelete(null)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-brand-border text-sm font-medium hover:bg-brand-surface-low transition-colors"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-brand-border text-sm font-medium hover:bg-brand-surface-low transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors shadow-sm"
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors shadow-sm cursor-pointer"
               >
                 Yes, delete user
               </button>

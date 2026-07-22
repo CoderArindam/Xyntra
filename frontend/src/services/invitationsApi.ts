@@ -30,6 +30,10 @@ export const adminListInvitations = async (): Promise<Invitation[]> => {
   return response.data;
 };
 
+export const adminRevokeInvitation = async (invitationId: number): Promise<void> => {
+  await axiosInstance.delete(`/invitations/${invitationId}`);
+};
+
 export const verifyInvitationToken = async (token: string): Promise<InvitationDetail> => {
   const response = await axiosInstance.get(`/invitations/verify/${token}`);
   return response.data;

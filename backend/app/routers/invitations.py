@@ -1,6 +1,6 @@
 import logging
 from typing import List
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, status
 
 from app.schemas.invitations import (
     InviteUserRequest,
@@ -8,8 +8,7 @@ from app.schemas.invitations import (
     AcceptInvitationRequest,
     InvitationDetailResponse,
 )
-from app.auth.dependencies import get_current_user
-from app.auth.permissions import require_super_admin
+from app.auth.permissions import require_manager_or_above
 from app.database.connection import get_db_connection
 from app.services.invitation_service import InvitationService
 
@@ -25,7 +24,7 @@ def get_invitation_service(conn = Depends(get_db_connection)) -> InvitationServi
 async def invite_user(
     invite_in: InviteUserRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(require_super_admin),
+    current_user: dict = Depends(require_manager_or_above),
     invitation_service: InvitationService = Depends(get_invitation_service)
 ):
     invitation, email, org_name, token = await invitation_service.invite_user(invite_in, current_user)
@@ -38,10 +37,19 @@ async def invite_user(
 
 @router.get("", response_model=List[InvitationResponse])
 async def list_invitations(
-    current_user: dict = Depends(require_super_admin),
+    current_user: dict = Depends(require_manager_or_above),
     invitation_service: InvitationService = Depends(get_invitation_service)
 ):
     return await invitation_service.list_invitations(current_user)
+
+@router.delete("/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_invitation(
+    invitation_id: int,
+    current_user: dict = Depends(require_manager_or_above),
+    invitation_service: InvitationService = Depends(get_invitation_service)
+):
+    await invitation_service.revoke_invitation(invitation_id, current_user)
+    return None
 
 @router.get("/verify/{token}", response_model=InvitationDetailResponse)
 async def verify_invitation(

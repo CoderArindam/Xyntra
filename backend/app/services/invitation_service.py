@@ -103,10 +103,31 @@ class InvitationService:
             logger.error(f"Error listing invitations: {e}")
             raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
+    async def revoke_invitation(self, invitation_id: int, current_user: dict):
+        try:
+            result = await self.conn.fetchval(
+                "SELECT revoke_invitation($1, $2)",
+                invitation_id,
+                current_user["organization_id"],
+            )
+            if not result:
+                raise HTTPException(status_code=404, detail="Pending invitation not found")
+            return json.loads(result) if isinstance(result, str) else result
+        except asyncpg.exceptions.RaiseError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error revoking invitation {invitation_id}: {e}")
+            raise HTTPException(status_code=400, detail="Pending invitation not found or already accepted")
+
     async def verify_invitation(self, token: str) -> dict:
         result = await self.conn.fetchval("SELECT get_invitation_by_token($1)", token)
         if not result:
-            raise HTTPException(status_code=404, detail="Invitation not found")
+            raise HTTPException(
+                status_code=410,
+                detail="This invitation link has been revoked or expired by an administrator."
+            )
 
         invitation = json.loads(result) if isinstance(result, str) else result
 
