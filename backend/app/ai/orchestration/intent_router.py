@@ -43,7 +43,6 @@ class IntentRouter:
         return None
         
     async def classify(self, user_input: str, request_id: str, organization_id: str, user_id: str, llm_context: str = None, user_has_permission: bool = True) -> IntentType:
-        print("user has permission", user_has_permission, "from intent_router.py file")
         """
         Classifies the intent, returning one of CONVERSATIONAL, KNOWLEDGE, or WORKSPACE_ACTION.
         Uses a two-stage approach: fast heuristics first, then LLM.

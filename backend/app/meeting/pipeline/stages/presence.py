@@ -50,7 +50,6 @@ class PresenceCollectionStage(PipelineStage):
         from app.meeting.logger import get_logger
         log = get_logger("pipeline.presence")
         log.info("Pipeline provider instance (json_provider)", provider_id=id(provider))
-        print(f"Pipeline provider:\n{id(provider)}")
         
         service = ParticipantPresenceService(provider)
         

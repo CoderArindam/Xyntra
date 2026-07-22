@@ -144,7 +144,7 @@ export function useAIChat() {
 
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        console.log('Stream aborted');
+        // Stream aborted by user
       } else {
         setError(err.message || 'An error occurred.');
       }

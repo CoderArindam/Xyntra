@@ -58,10 +58,6 @@ export default function LandingPage() {
     navigate("/login");
   };
 
-  const handleDemo = () => {
-    console.log("Demo clicked");
-  };
-
   return (
     <div className="min-h-screen bg-[#0b0e14] text-white font-sans">
       <header className="flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
@@ -116,7 +112,7 @@ export default function LandingPage() {
             </button>
 
             <button
-              onClick={handleDemo}
+              onClick={handleLogin}
               className="border border-white/20 px-6 py-3 rounded-xl flex items-center gap-2"
             >
               <span className="material-symbols-outlined">play_circle</span>

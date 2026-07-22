@@ -354,14 +354,20 @@ class DynamicAttributionEngine:
             if seg.text.strip().endswith("?"):
                 question_count += 1
 
-            # Console diagnostics when DEBUG_ATTRIBUTION=True
+            # Diagnostics when DEBUG_ATTRIBUTION=True
             if meeting_config.DEBUG_ATTRIBUTION:
-                print(f"\n--- Segment {seg.segment_id} [{seg.start_time:.1f}s - {seg.end_time:.1f}s] ---")
-                print(f"Text: \"{seg.text}\" | Deepgram Label: {seg.speaker_label}")
-                print("Candidates:")
-                for c in candidate_scores_list:
-                    print(f"  {c.participant_name} ({c.participant_id}): Final {c.final_score:.2f}")
-                print(f"Winner: {winner_pname} ({winner_pid}) | Reason: {win_reason} | Gap: {score_gap:.2f} | Conf: {calc_confidence:.2f}")
+                log.debug(
+                    "Attribution decision",
+                    segment_id=seg.segment_id,
+                    time_range=f"{seg.start_time:.1f}s - {seg.end_time:.1f}s",
+                    text=seg.text,
+                    deepgram_label=seg.speaker_label,
+                    winner_name=winner_pname,
+                    winner_id=winner_pid,
+                    reason=win_reason,
+                    gap=f"{score_gap:.2f}",
+                    confidence=f"{calc_confidence:.2f}"
+                )
 
             # Detect vocative targets from CandidateScores list for addressee priming in next turn
             vocative_trace = next((t for c in candidate_scores_list for t in c.rule_traces if t.rule_name == "Vocative" and t.contribution < 0), None)

@@ -46,9 +46,7 @@ export interface BoardData {
 }
 
 export const getBoardTasks = async (boardId: number): Promise<BoardData> => {
-  const url = `/boards/${boardId}/tasks`;
-  console.log('[tasksApi] GET', url);
-  const response = await api.get(url);
+  const response = await api.get(`/boards/${boardId}/tasks`);
   return response.data.data;
 };
 

@@ -13,7 +13,6 @@ class WorkspaceContextBuilder(BaseContextBuilder):
         self.conn = conn
 
     async def build(self, current_user: dict, board_id: int = None, **kwargs: Any) -> Dict[str, Any]:
-        print('Current user from workspace_context.py file', current_user)
         first_name = current_user.get('first_name', '')
         last_name = current_user.get('last_name', '')
         email = current_user.get('email', '')

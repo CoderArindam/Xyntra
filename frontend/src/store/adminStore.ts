@@ -54,6 +54,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   isFetchingUsers: false,
   isFetchingInvitations: false,
   isInvitingUser: false,
+  isRevokingInvitation: false,
   isUpdatingRole: false,
   isDeletingUser: false,
   

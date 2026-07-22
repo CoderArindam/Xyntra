@@ -28,7 +28,6 @@ async def chat_endpoint(
         
     ai_service = AIService(conn)
     request_id = str(uuid.uuid4())
-    print('Current user from ai.py file', current_user)
     
     return StreamingResponse(
         ai_service.chat_stream(request, current_user, request_id),
