@@ -10,8 +10,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  X
+  X,
+  Clock,
+  ClipboardCheck,
 } from 'lucide-react';
+import { isManagerOrAdmin, isSuperAdmin } from '../../lib/rbac';
 import { useAuthStore } from '../../store/authStore';
 import { useBoardStore, useActiveBoards } from '../../store/boardStore';
 import { useNotificationStore } from '../../store/notificationStore';
@@ -111,6 +114,10 @@ export const ApplicationSidebar: React.FC = () => {
           <div className="space-y-1">
             <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" isExact />
             <NavItem to="/my-work" icon={CheckSquare} label="My Work" />
+            <NavItem to="/timesheets" icon={Clock} label="Timesheets" />
+            {isManagerOrAdmin(user) && (
+              <NavItem to="/timesheets/approvals" icon={ClipboardCheck} label="Approval Queue" />
+            )}
           </div>
         </div>
 
@@ -167,10 +174,11 @@ export const ApplicationSidebar: React.FC = () => {
         </div>
 
         {/* Administration Section */}
-        {user?.role === 'SUPER_ADMIN' && (
+        {isSuperAdmin(user) && (
           <div className="px-3 mb-6">
             {!isSidebarCollapsed && <h3 className="px-3 text-xs font-bold text-sidebar-text-muted uppercase tracking-wider mb-2">Administration</h3>}
             <div className="space-y-1">
+              <NavItem to="/settings/timesheets" icon={Clock} label="Timesheet Policy" />
               <NavItem to="/admin" icon={ShieldAlert} label="Admin Panel" />
             </div>
           </div>

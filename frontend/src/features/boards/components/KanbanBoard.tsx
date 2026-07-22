@@ -15,6 +15,7 @@ import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { useTaskStore } from '../../../store/taskStore';
 import { useUiStore } from '../../../store/uiStore';
 import { useAuthStore } from '../../../store/authStore';
+import { isManagerOrAdmin } from '../../../lib/rbac';
 import TaskCard from './TaskCard';
 import TaskDetailsModal from '../modals/task-details';
 import CreateTaskModal from '../modals/CreateTaskModal';
@@ -212,7 +213,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardId }) => {
     await moveTask(task.id, targetColumnId);
   };
 
-  const isManagerOrAdmin = ['SUPER_ADMIN', 'MANAGER'].includes((user?.role || '').toUpperCase());
+  const isManager = isManagerOrAdmin(user);
 
   return (
     <DndContext
@@ -228,19 +229,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardId }) => {
           </h1>
 
           <div className="flex gap-3 items-center">
-            {isManagerOrAdmin ? (
+            {isManager && (
               <button
                 onClick={() => setIsAddMemberModalOpen(true)}
                 className="bg-brand-primary hover:bg-brand-primary-hover text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer focus:ring-2 focus:ring-brand-primary focus:outline-none"
               >
                 <UserPlus className="w-4 h-4" /> Add Member
-              </button>
-            ) : (
-              <button
-                onClick={() => setIsAddMemberModalOpen(true)}
-                className="px-4 py-2 rounded-full border border-brand-border bg-brand-surface text-sm font-medium hover:bg-brand-surface-low transition-colors cursor-pointer"
-              >
-                Board Members
               </button>
             )}
           </div>

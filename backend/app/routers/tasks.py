@@ -29,13 +29,20 @@ async def create_task(
 
 @router.get("/boards/{board_id}/tasks", response_model=DataEnvelope[BoardDataResponse])
 async def get_board_tasks(
-    board_id: int,
+    board_id: str,
     assigned_to: Optional[int] = Query(default=None),
     current_user: dict = Depends(get_current_user),
     task_service: TaskService = Depends(get_task_service)
 ):
-    data = await task_service.get_board_tasks(board_id, assigned_to, current_user)
+    b_str = str(board_id).strip()
+    try:
+        int_board_id = int(b_str.split('-')[-1]) if '-' in b_str else int(b_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid board ID format: {board_id}")
+
+    data = await task_service.get_board_tasks(int_board_id, assigned_to, current_user)
     return DataEnvelope(data=data)
+
 
 
 @router.patch("/tasks/{task_id}", response_model=DataEnvelope[CanonicalTaskResponse])

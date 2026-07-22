@@ -3,6 +3,8 @@ import { UserPlus, Mail, Search, Check, Loader2, X, Shield, UserCheck } from 'lu
 import { getUsers, getBoardMembers, type User, type BoardMember } from '../../../services/usersApi';
 import { adminAssignUser } from '../../../services/adminApi';
 import { adminInviteUser } from '../../../services/invitationsApi';
+import { useAuthStore } from '../../../store/authStore';
+import { isManagerOrAdmin } from '../../../lib/rbac';
 
 interface AddMemberModalProps {
   isOpen: boolean;
@@ -17,6 +19,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   boardId,
   onMemberAdded,
 }) => {
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'existing' | 'invite'>('existing');
 
   // Existing Users State
@@ -123,6 +126,8 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen || !isManagerOrAdmin(user)) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">

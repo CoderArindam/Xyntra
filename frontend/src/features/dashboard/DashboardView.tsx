@@ -23,6 +23,9 @@ import {
   type DashboardBoardSummary,
   type DashboardActivityItem,
 } from '../../services/dashboardApi';
+import { getApprovalQueueSummary } from '../../services/timesheetApprovalService';
+import { getOrgSummaryReport } from '../../services/timesheetReportsApi';
+import { isManagerOrAdmin } from '../../lib/rbac';
 
 // Widgets
 import { KpiCardsRow } from './components/KpiCardsRow';
@@ -62,10 +65,15 @@ export const DashboardView: React.FC = () => {
   const [isLoadingSummary, setIsLoadingSummary] = useState<boolean>(false);
   const [hasSummaryError, setHasSummaryError] = useState<boolean>(false);
 
-  const userRole = (user?.role || '').toUpperCase();
-  const isManagerOrAdmin = ['SUPER_ADMIN', 'MANAGER'].includes(userRole) || true; // Apply manager/admin view as requested
+  // Timesheet dashboard state
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
+  const [timesheetComplianceRate, setTimesheetComplianceRate] = useState<number>(0);
+  const [timesheetHoursLogged, setTimesheetHoursLogged] = useState<number>(0);
 
-  const userName = user?.first_name || user?.email?.split('@')[0] || 'Arindam';
+  // Single source of truth for role — uses lib/rbac which handles all casing variants
+  const canAccessAdminFeatures = isManagerOrAdmin(user);
+
+  const userName = user?.first_name || user?.email?.split('@')[0] || 'User';
 
   const fetchProposalsCount = React.useCallback(async () => {
     try {
@@ -99,14 +107,39 @@ export const DashboardView: React.FC = () => {
     }
   }, []);
 
+  const fetchTimesheetSummary = React.useCallback(async () => {
+    try {
+      const queueSummary = await getApprovalQueueSummary();
+      if (queueSummary && queueSummary.pending_count !== undefined) {
+        setPendingApprovalsCount(queueSummary.pending_count);
+      }
+    } catch (err) {
+      console.error('Failed to load approval queue summary:', err);
+    }
+
+    try {
+      const reports = await getOrgSummaryReport(1);
+      if (reports && reports.length > 0) {
+        setTimesheetComplianceRate(reports[0].compliance_rate || 0);
+        setTimesheetHoursLogged(reports[0].total_hours_logged || 0);
+      }
+    } catch (err) {
+      console.error('Failed to load org summary report:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchBoards();
   }, [fetchBoards]);
 
   useEffect(() => {
-    fetchProposalsCount();
-    fetchSummaryData();
-  }, [fetchProposalsCount, fetchSummaryData]);
+    if (canAccessAdminFeatures) {
+      fetchProposalsCount();
+      fetchSummaryData();
+      fetchTimesheetSummary();
+    }
+  }, [fetchProposalsCount, fetchSummaryData, fetchTimesheetSummary, canAccessAdminFeatures]);
+
 
   const fetchSessions = React.useCallback(async () => {
     try {
@@ -118,8 +151,10 @@ export const DashboardView: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchSessions();
-  }, [fetchSessions]);
+    if (canAccessAdminFeatures) {
+      fetchSessions();
+    }
+  }, [fetchSessions, canAccessAdminFeatures]);
 
   const filteredActiveBoards = activeBoards.filter((board: any) =>
     board.name.toLowerCase().includes(search.toLowerCase())
@@ -131,41 +166,49 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in">
-      {/* 1. Header Greeting & Quick Actions Bar */}
+      {/* Header Greeting & Quick Actions — role-aware */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-brand-text">
             {getGreeting()}, {userName}
           </h1>
-          <p className="text-sm text-brand-text-muted mt-1 font-medium">
-            Today: {pendingProposalsCount} new AI recommendations, {summaryBoards.length > 0 ? summaryBoards.filter(b => b.overdue_count === 0).length : Math.max(1, activeBoards.length)} projects on track, and {kpis && kpis.total_tasks > 0 ? Math.round(((kpis.tasks_by_status?.done || 0) / kpis.total_tasks) * 100) : 92}% efficiency rate.
-          </p>
+          {canAccessAdminFeatures ? (
+            <p className="text-sm text-brand-text-muted mt-1 font-medium">
+              Today: {pendingProposalsCount} new AI recommendations, {summaryBoards.length > 0 ? summaryBoards.filter(b => b.overdue_count === 0).length : Math.max(1, activeBoards.length)} projects on track, and {kpis && kpis.total_tasks > 0 ? Math.round(((kpis.tasks_by_status?.done || 0) / kpis.total_tasks) * 100) : 92}% efficiency rate.
+            </p>
+          ) : (
+            <p className="text-sm text-brand-text-muted mt-1 font-medium">
+              Here's an overview of your assigned projects and tasks.
+            </p>
+          )}
         </div>
 
-        {/* Top Right Action Buttons */}
-        <div className="flex items-center flex-wrap gap-3 shrink-0">
-          <button
-            onClick={() => setIsJoinModalOpen(true)}
-            className="bg-brand-primary hover:bg-brand-primary-hover text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shadow-xs hover:shadow-md cursor-pointer focus:ring-2 focus:ring-brand-primary focus:outline-none"
-            aria-label="Start or Join Meeting"
-          >
-            <Video className="w-4 h-4" aria-hidden="true" />
-            Start / Join Meeting
-          </button>
+        {/* Quick actions — only for managers and admins */}
+        {canAccessAdminFeatures && (
+          <div className="flex items-center flex-wrap gap-3 shrink-0">
+            <button
+              onClick={() => setIsJoinModalOpen(true)}
+              className="bg-brand-primary hover:bg-brand-primary-hover text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shadow-xs hover:shadow-md cursor-pointer focus:ring-2 focus:ring-brand-primary focus:outline-none"
+              aria-label="Start or Join Meeting"
+            >
+              <Video className="w-4 h-4" aria-hidden="true" />
+              Start / Join Meeting
+            </button>
 
-          <button
-            onClick={() => setIsProposalsModalOpen(true)}
-            className="bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shadow-xs hover:shadow-md cursor-pointer focus:ring-2 focus:ring-teal-500 focus:outline-none"
-            aria-label="View AI Proposals"
-          >
-            <Sparkles className="w-4 h-4 text-white" aria-hidden="true" />
-            View Proposals ({pendingProposalsCount})
-          </button>
-        </div>
+            <button
+              onClick={() => setIsProposalsModalOpen(true)}
+              className="bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all shadow-xs hover:shadow-md cursor-pointer focus:ring-2 focus:ring-teal-500 focus:outline-none"
+              aria-label="View AI Proposals"
+            >
+              <Sparkles className="w-4 h-4 text-white" aria-hidden="true" />
+              View Proposals ({pendingProposalsCount})
+            </button>
+          </div>
+        )}
       </div>
 
       {/* MEMBER ROLE VIEW (If non-manager) */}
-      {!isManagerOrAdmin ? (
+      {!canAccessAdminFeatures ? (
         <div className="space-y-8">
           <section className="space-y-6" aria-label="Member Active Projects">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -226,6 +269,9 @@ export const DashboardView: React.FC = () => {
             pendingProposalsCount={pendingProposalsCount}
             organizationName={profile?.name}
             onOpenProposalsModal={() => setIsProposalsModalOpen(true)}
+            pendingApprovalsCount={pendingApprovalsCount}
+            timesheetComplianceRate={timesheetComplianceRate}
+            timesheetHoursLogged={timesheetHoursLogged}
           />
 
           {/* 2. Main Content 2-Column Grid */}

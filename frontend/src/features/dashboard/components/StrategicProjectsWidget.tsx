@@ -255,10 +255,11 @@ export const StrategicProjectsWidget: React.FC<StrategicProjectsWidgetProps> = (
                   <div className="flex items-center -space-x-2 shrink-0 self-start sm:self-auto">
                     {membersToRender.slice(0, 4).map((member, mIdx) => (
                       <div
-                        key={member.id || mIdx}
+                        key={`${board.id}-member-${member.id || mIdx}-${mIdx}`}
                         className={`w-8 h-8 rounded-full border-2 border-brand-surface flex items-center justify-center text-[10px] font-bold shadow-xs overflow-hidden ${
                           AVATAR_PALETTES[(mIdx + idx) % AVATAR_PALETTES.length]
                         }`}
+
                         title={member.fullName}
                       >
                         {member.avatarUrl ? (

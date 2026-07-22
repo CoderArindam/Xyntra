@@ -16,6 +16,9 @@ interface KpiCardsRowProps {
   pendingProposalsCount: number;
   organizationName?: string;
   onOpenProposalsModal: () => void;
+  pendingApprovalsCount?: number;
+  timesheetComplianceRate?: number;
+  timesheetHoursLogged?: number;
 }
 
 export const KpiCardsRow: React.FC<KpiCardsRowProps> = ({
@@ -27,6 +30,9 @@ export const KpiCardsRow: React.FC<KpiCardsRowProps> = ({
   activeBoardsFallback,
   pendingProposalsCount,
   onOpenProposalsModal,
+  pendingApprovalsCount = 0,
+  timesheetComplianceRate = 0,
+  timesheetHoursLogged = 0,
 }) => {
   const navigate = useNavigate();
 
@@ -80,7 +86,7 @@ export const KpiCardsRow: React.FC<KpiCardsRowProps> = ({
 
   return (
     <section
-      className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6"
+      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6"
       aria-label="Dashboard Key Performance Indicators"
     >
       {/* KPI 1: Total Tasks - Clickable to /my-work */}
@@ -280,8 +286,60 @@ export const KpiCardsRow: React.FC<KpiCardsRowProps> = ({
           Pending Review: <span className="font-bold text-teal-600 dark:text-teal-400 ml-1">{pendingProps}</span>
         </div>
       </Card>
+
+      {/* KPI 5: Pending Approvals (Timesheets) - Clickable to /timesheets/approvals */}
+      <Card
+        hoverEffect
+        padding="md"
+        variant="default"
+        onClick={() => navigate('/timesheets/approvals')}
+        className="relative overflow-hidden flex flex-col justify-between p-6 bg-brand-surface border-brand-border/80 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-xs font-semibold text-brand-text-muted group-hover:text-amber-600 transition-colors">
+              Pending Approvals
+            </h3>
+            <div className="text-4xl font-extrabold text-brand-text tracking-tight mt-2">
+              {pendingApprovalsCount}
+            </div>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-brand-surface-low flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+            <ArrowUpRight className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Smooth Area Curve SVG */}
+        <div className="h-14 w-full mt-4 -mb-2">
+          <svg className="w-full h-full overflow-visible" viewBox="0 0 200 60" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="pendingApprovalsGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M 0 35 C 40 45, 80 20, 120 30 C 160 40, 180 15, 200 25 L 200 60 L 0 60 Z"
+              fill="url(#pendingApprovalsGrad)"
+            />
+            <path
+              d="M 0 35 C 40 45, 80 20, 120 30 C 160 40, 180 15, 200 25"
+              fill="none"
+              stroke="#f59e0b"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+          </svg>
+        </div>
+
+        <div className="flex justify-between items-center pt-2 text-xs font-medium text-brand-text-muted">
+          <span>Rate: <strong className="text-amber-600 dark:text-amber-400">{timesheetComplianceRate}%</strong></span>
+          <span>Logged: <strong className="text-brand-text">{timesheetHoursLogged}h</strong></span>
+        </div>
+      </Card>
     </section>
   );
+
 };
 
 export default KpiCardsRow;

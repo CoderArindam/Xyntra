@@ -1,10 +1,12 @@
 import React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { User, Building2, Palette, Bell, Shield, Key, CreditCard, Keyboard, Boxes } from 'lucide-react';
+import { User, Building2, Palette, Bell, Shield, Key, CreditCard, Keyboard, Boxes, Clock } from 'lucide-react';
+import { isManagerOrAdmin } from '../../lib/rbac';
 
 const SETTINGS_TABS = [
   { path: '/settings/account', label: 'My Account', icon: User, showFor: 'ALL' },
+  { path: '/settings/timesheets', label: 'Timesheet Policy', icon: Clock, showFor: 'SUPER_ADMIN' },
   { path: '/settings/organization', label: 'Workspace', icon: Building2, showFor: 'SUPER_ADMIN' },
   { path: '/settings/appearance', label: 'Appearance', icon: Palette, showFor: 'ALL' },
   { path: '/settings/notifications', label: 'Notifications', icon: Bell, showFor: 'ALL' },
@@ -20,7 +22,9 @@ export const SettingsLayout: React.FC = () => {
   const location = useLocation();
 
   const visibleTabs = SETTINGS_TABS.filter(tab => 
-    tab.showFor === 'ALL' || (tab.showFor === 'SUPER_ADMIN' && user?.role === 'SUPER_ADMIN')
+    tab.showFor === 'ALL' || 
+    (tab.showFor === 'SUPER_ADMIN' && user?.role === 'SUPER_ADMIN') ||
+    (tab.showFor === 'MANAGER_OR_ADMIN' && isManagerOrAdmin(user))
   );
 
   return (

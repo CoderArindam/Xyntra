@@ -9,7 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pathlib import Path
 from app.database.connection import db
-from app.routers import auth, boards, tasks, users, comments, attachments, activity, board_members, admin, invitations, notifications, my_work, preferences, organization, ai, task_proposals, dashboard
+from app.routers import (
+    auth, boards, tasks, users, comments, attachments, activity,
+    board_members, admin, invitations, notifications, my_work,
+    preferences, organization, ai, task_proposals, dashboard,
+    timesheet_admin, timesheets, timesheet_approvals
+)
 from app.meeting.api import router as meeting_router
 
 @asynccontextmanager
@@ -64,7 +69,12 @@ app.include_router(organization.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
 app.include_router(task_proposals.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
+# Mount timesheet routers
+app.include_router(timesheet_admin.router, prefix="/api/v1")
+app.include_router(timesheet_approvals.router, prefix="/api/v1")
+app.include_router(timesheets.router, prefix="/api/v1")
 app.include_router(meeting_router, prefix="/api/v1")
+
 
 @app.get("/health", tags=["Health"])
 async def health_check():

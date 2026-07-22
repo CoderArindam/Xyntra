@@ -142,3 +142,120 @@ class NotificationService:
             )
         except Exception as e:
             raise HTTPException(status_code=500, detail="Failed to delete notification")
+
+    async def notify_timesheet_submitted(self, timesheet_id, submitter_id, approver_id, week_label, submitter_name: str = None):
+        return await notify_timesheet_submitted(self.conn, timesheet_id, submitter_id, approver_id, week_label, submitter_name)
+
+    async def notify_timesheet_approved(self, timesheet_id, submitter_id, approver_id, week_label):
+        return await notify_timesheet_approved(self.conn, timesheet_id, submitter_id, approver_id, week_label)
+
+    async def notify_timesheet_rejected(self, timesheet_id, submitter_id, approver_id, week_label, comment: str = None):
+        return await notify_timesheet_rejected(self.conn, timesheet_id, submitter_id, approver_id, week_label, comment)
+
+    async def notify_timesheet_recalled(self, timesheet_id, submitter_id, approver_id, week_label, reason: str = None, submitter_name: str = None):
+        return await notify_timesheet_recalled(self.conn, timesheet_id, submitter_id, approver_id, week_label, reason, submitter_name)
+
+
+from uuid import UUID
+
+def _to_uuid(val) -> UUID | None:
+    if val is None:
+        return None
+    if isinstance(val, UUID):
+        return val
+    s_val = str(val).strip()
+    if s_val.isdigit():
+        return UUID(f"00000000-0000-0000-0000-{int(s_val):012d}")
+    try:
+        return UUID(s_val)
+    except Exception:
+        return None
+
+
+async def notify_timesheet_submitted(conn: asyncpg.Connection, timesheet_id, submitter_id, approver_id, week_label: str, submitter_name: str = None):
+    name_str = submitter_name or "A team member"
+    title = f"{name_str} submitted a timesheet for {week_label}"
+    deep_link = f"/timesheets/approvals?id={timesheet_id}"
+
+    ts_uuid = _to_uuid(timesheet_id)
+    sub_uuid = _to_uuid(submitter_id)
+
+    targets = []
+    if approver_id:
+        targets = [_to_uuid(approver_id)]
+    else:
+        org_id = await conn.fetchval("SELECT org_id FROM v_timesheets_canonical WHERE id = $1", ts_uuid)
+        if org_id:
+            rows = await conn.fetch(
+                "SELECT id FROM v_users_canonical WHERE (organization_id = $1 OR organization_id::text = $1::text) AND LOWER(role::text) IN ('superadmin', 'super_admin', 'manager')",
+                org_id
+            )
+            targets = [_to_uuid(r["id"]) for r in rows if str(r["id"]) != str(submitter_id)]
+
+    for target_id in targets:
+        if not target_id:
+            continue
+        try:
+            await conn.fetchval(
+                "SELECT fn_create_timesheet_notification($1, $2, $3, $4, $5, $6, $7)",
+                target_id, sub_uuid, title, None, deep_link, ts_uuid, "CREATED"
+            )
+        except Exception as e:
+            logger.error(f"Failed to create timesheet submitted notification for target {target_id}: {e}")
+
+
+async def notify_timesheet_approved(conn: asyncpg.Connection, timesheet_id, submitter_id, approver_id, week_label: str):
+    sub_uuid = _to_uuid(submitter_id)
+    app_uuid = _to_uuid(approver_id)
+    ts_uuid = _to_uuid(timesheet_id)
+    if not sub_uuid:
+        return None
+    title = f"Your timesheet for {week_label} was approved"
+    deep_link = f"/timesheets?id={timesheet_id}"
+    try:
+        return await conn.fetchval(
+            "SELECT fn_create_timesheet_notification($1, $2, $3, $4, $5, $6, $7)",
+            sub_uuid, app_uuid, title, None, deep_link, ts_uuid, "STATUS_CHANGED"
+        )
+    except Exception as e:
+        logger.error(f"Failed to create timesheet approved notification: {e}")
+        return None
+
+async def notify_timesheet_rejected(conn: asyncpg.Connection, timesheet_id, submitter_id, approver_id, week_label: str, comment: str = None):
+    sub_uuid = _to_uuid(submitter_id)
+    app_uuid = _to_uuid(approver_id)
+    ts_uuid = _to_uuid(timesheet_id)
+    if not sub_uuid:
+        return None
+    title = f"Your timesheet for {week_label} needs revision"
+    body = comment[:120] if comment else None
+    deep_link = f"/timesheets?id={timesheet_id}"
+    try:
+        return await conn.fetchval(
+            "SELECT fn_create_timesheet_notification($1, $2, $3, $4, $5, $6, $7)",
+            sub_uuid, app_uuid, title, body, deep_link, ts_uuid, "STATUS_CHANGED"
+        )
+    except Exception as e:
+        logger.error(f"Failed to create timesheet rejected notification: {e}")
+        return None
+
+async def notify_timesheet_recalled(conn: asyncpg.Connection, timesheet_id, submitter_id, approver_id, week_label: str, reason: str = None, submitter_name: str = None):
+    sub_uuid = _to_uuid(submitter_id)
+    app_uuid = _to_uuid(approver_id)
+    ts_uuid = _to_uuid(timesheet_id)
+    if not app_uuid:
+        return None
+    name_str = submitter_name or "A team member"
+    title = f"{name_str} recalled their timesheet for {week_label}"
+    body = reason[:120] if reason else None
+    deep_link = "/timesheets/approvals"
+    try:
+        return await conn.fetchval(
+            "SELECT fn_create_timesheet_notification($1, $2, $3, $4, $5, $6, $7)",
+            app_uuid, sub_uuid, title, body, deep_link, ts_uuid, "STATUS_CHANGED"
+        )
+    except Exception as e:
+        logger.error(f"Failed to create timesheet recalled notification: {e}")
+        return None
+
+

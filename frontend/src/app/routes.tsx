@@ -11,6 +11,8 @@ import AcceptInvitation from '../features/auth/AcceptInvitation';
 import DashboardView from '../features/dashboard/DashboardView';
 import BoardPage from '../features/boards/BoardPage';
 import MyWorkPage from '../features/my-work/MyWorkPage';
+import MyTimesheetsPage from '../features/timesheets/member/MyTimesheetsPage';
+import ApprovalQueuePage from '../features/timesheets/approvals/ApprovalQueuePage';
 
 import AdminLayout from '../features/admin/AdminLayout';
 import AdminDashboard from '../features/admin/AdminDashboard';
@@ -24,6 +26,7 @@ import Organization from '../features/settings/Organization';
 import Appearance from '../features/settings/Appearance';
 import NotificationSettings from '../features/settings/NotificationSettings';
 import PlaceholderSetting from '../features/settings/PlaceholderSetting';
+import TimesheetAdminPage from '../features/timesheets/admin/TimesheetAdminPage';
 
 import { ProjectSettingsLayout } from '../features/projects/ProjectSettingsLayout';
 import { ProjectSettingsPage } from '../features/projects/ProjectSettingsPage';
@@ -55,14 +58,21 @@ export const AppRoutes: React.FC = () => {
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardView />} />
           <Route path="/my-work" element={<MyWorkPage />} />
+          <Route path="/timesheets" element={<MyTimesheetsPage />} />
           <Route path="/board/:id" element={<BoardPage />} />
 
 
-          {/* Role-gated proposal review queue routes */}
+          {/* Role-gated timesheet approvals & proposal review queue routes */}
           <Route element={<RequireRole allowedRoles={['SUPER_ADMIN', 'MANAGER']} />}>
+            <Route path="/timesheets/approvals" element={<ApprovalQueuePage />} />
             <Route path="/meetings/:sessionId/proposals" element={<ProposalQueueView />} />
             <Route path="/meeting/:sessionId/proposals" element={<ProposalQueueView />} />
           </Route>
+
+          <Route element={<RequireRole allowedRoles={['SUPER_ADMIN']} />}>
+            <Route path="/timesheets/admin" element={<TimesheetAdminPage />} />
+          </Route>
+
 
           {/* Role-gated project settings routes */}
           <Route element={<RequireRole allowedRoles={['SUPER_ADMIN', 'MANAGER']} />}>
@@ -132,6 +142,7 @@ export const AppRoutes: React.FC = () => {
           {/* Settings Routes */}
           <Route path="/settings" element={<SettingsLayout />}>
             <Route path="account" element={<MyAccount />} />
+            <Route path="timesheets" element={<TimesheetAdminPage />} />
             <Route path="organization" element={<Organization />} />
             <Route path="appearance" element={<Appearance />} />
             <Route path="notifications" element={<NotificationSettings />} />

@@ -45,10 +45,11 @@ export interface BoardData {
   tasks: Task[];
 }
 
-export const getBoardTasks = async (boardId: number): Promise<BoardData> => {
+export const getBoardTasks = async (boardId: number | string): Promise<BoardData> => {
   const response = await api.get(`/boards/${boardId}/tasks`);
   return response.data.data;
 };
+
 
 export const createTask = async (taskData: Partial<Task>): Promise<Task> => {
   const response = await api.post('/tasks', taskData);
