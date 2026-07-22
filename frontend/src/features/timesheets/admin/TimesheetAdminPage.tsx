@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Settings, Sliders, Users, BarChart3, Clock, Eye } from 'lucide-react';
 import { useAuthStore } from '../../../store/authStore';
-import { isManagerOrAdmin, isSuperAdmin } from '../../../lib/rbac';
+import { isSuperAdmin } from '../../../lib/rbac';
 import TimesheetPolicyForm from './TimesheetPolicyForm';
 import ApproverAssignmentManager from './ApproverAssignmentManager';
 import { Card, CardTitle, CardDescription, CardContent } from '../../../components/ui/Card';

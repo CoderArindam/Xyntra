@@ -15,7 +15,6 @@ import {
   getTimesheetDetail,
   type Timesheet,
   type TimesheetDetail,
-  type TimesheetEntry,
 } from '../../../services/timesheetService';
 import {
   getTimesheetPolicy,
@@ -29,6 +28,7 @@ import TimeEntryRow from '../member/TimeEntryRow';
 import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { TimesheetErrorBanner, parseTimesheetError, type TimesheetApiError } from '../shared/TimesheetErrorBanner';
+import { groupEntriesByBoard, buildWeekDates } from '../shared/utils';
 
 export interface TimesheetReviewModalProps {
   timesheetId: string;
@@ -37,16 +37,7 @@ export interface TimesheetReviewModalProps {
   onRejected: (ts: Timesheet) => void;
 }
 
-interface BoardRowGroup {
-  boardId: string;
-  boardName: string;
-  rows: {
-    taskId?: string;
-    taskTitle?: string;
-    entryType: string;
-    entries: TimesheetEntry[];
-  }[];
-}
+
 
 export const TimesheetReviewModal: React.FC<TimesheetReviewModalProps> = ({
   timesheetId,
@@ -139,49 +130,9 @@ export const TimesheetReviewModal: React.FC<TimesheetReviewModalProps> = ({
     }
   };
 
-  // Build 7 days
-  const weekDates: Date[] = [];
-  if (detail?.week_start_date) {
-    const start = new Date(detail.week_start_date + 'T00:00:00');
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      weekDates.push(d);
-    }
-  }
-
-  // Build grouped rows
-  const boardGroupsMap = new Map<string, BoardRowGroup>();
-  if (detail) {
-    detail.entries.forEach((entry) => {
-      const bId = entry.board_id || 'general';
-      const bName = entry.board_name || (bId === 'general' ? 'General & Time-off' : 'Unknown Board');
-
-      if (!boardGroupsMap.has(bId)) {
-        boardGroupsMap.set(bId, {
-          boardId: bId,
-          boardName: bName,
-          rows: [],
-        });
-      }
-
-      const group = boardGroupsMap.get(bId)!;
-      const rowKey = `${entry.task_id || 'none'}_${entry.entry_type}`;
-      let row = group.rows.find((r) => `${r.taskId || 'none'}_${r.entryType}` === rowKey);
-
-      if (!row) {
-        row = {
-          taskId: entry.task_id || undefined,
-          taskTitle: entry.task_title || undefined,
-          entryType: entry.entry_type,
-          entries: [],
-        };
-        group.rows.push(row);
-      }
-      row.entries.push(entry);
-    });
-  }
-  const boardGroups = Array.from(boardGroupsMap.values());
+  // Build 7 days and grouped rows using shared utilities
+  const weekDates = detail?.week_start_date ? buildWeekDates(detail.week_start_date) : [];
+  const boardGroups = detail ? groupEntriesByBoard(detail) : [];
 
   const getStatusBadge = (status?: string) => {
     const s = (status || '').toLowerCase();

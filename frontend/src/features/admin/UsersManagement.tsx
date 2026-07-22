@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useAdminStore } from '../../store/adminStore';
 import { useAuthStore } from '../../store/authStore';
-import { Trash2, Loader2, X, AlertTriangle, Users, Mail, UserX } from 'lucide-react';
+import { Trash2, Loader2, Users, Mail, UserX } from 'lucide-react';
 import { UserAvatar } from '../../components/common/UserAvatar';
 import { formatUserName } from '../../utils/userHelpers';
 import { usePageTitle } from '../../hooks/usePageTitle';
-import WorkspaceLogo from '../../components/common/WorkspaceLogo';
 import { useOrganizationStore } from '../../store/organizationStore';
+import { InviteUserModal } from './modals/InviteUserModal';
+import { RevokeInvitationModal } from './modals/RevokeInvitationModal';
+import { DeleteUserModal } from './modals/DeleteUserModal';
 
 const UsersManagement: React.FC = () => {
   const { 
@@ -252,167 +254,35 @@ const UsersManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Invite Modal */}
-      {isInviteModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeInviteModal} />
-          <div className="bg-brand-surface border border-brand-border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative z-10 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-6 border-b border-brand-border">
-              <h2 className="text-xl font-bold text-brand-text">Invite User</h2>
-              <button 
-                onClick={closeInviteModal}
-                className="text-brand-text-muted hover:text-brand-text bg-brand-surface-low hover:bg-brand-border p-2 rounded-full transition-colors cursor-pointer"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleInviteUser} className="p-6 flex flex-col gap-5">
-              <div className="flex flex-col items-center text-center mb-2">
-                <WorkspaceLogo name={profile?.name} logoUrl={profile?.logo_url} size="xl" variant="rounded" className="mb-3 shadow-sm" />
-                <h3 className="text-lg font-semibold text-brand-text">{profile?.name || 'Workspace'}</h3>
-                {newEmail ? (
-                  <p className="text-sm text-brand-text-muted mt-1">
-                    You're inviting <span className="font-medium text-brand-text">{newEmail}</span> to {profile?.name || 'Workspace'} as <span className="font-medium text-brand-text capitalize">{newRole.toLowerCase()}</span>
-                  </p>
-                ) : (
-                  <p className="text-sm text-brand-text-muted mt-1">Invite a new member to join your workspace</p>
-                )}
-              </div>
+      <InviteUserModal
+        isOpen={isInviteModalOpen}
+        onClose={closeInviteModal}
+        onSubmit={handleInviteUser}
+        email={newEmail}
+        onEmailChange={setNewEmail}
+        role={newRole}
+        onRoleChange={setNewRole}
+        inviteError={inviteError}
+        isInvitingUser={isInvitingUser}
+        profileName={profile?.name}
+        profileLogoUrl={profile?.logo_url}
+      />
 
-              {inviteError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-500 flex items-center gap-2">
-                  <AlertTriangle size={16} className="shrink-0" />
-                  <span>{inviteError}</span>
-                </div>
-              )}
+      <RevokeInvitationModal
+        invitation={invitationToRevoke}
+        onClose={() => setInvitationToRevoke(null)}
+        onConfirm={confirmRevokeInvitation}
+        isRevoking={isRevokingInvitation}
+      />
 
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-brand-text">Email Address</label>
-                <input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="user@example.com"
-                  className="bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-brand-text text-sm outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-shadow"
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-brand-text">Role</label>
-                <select
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                  className="bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-brand-text text-sm outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition-shadow appearance-none cursor-pointer"
-                >
-                  <option value="MEMBER" className="text-black">Member</option>
-                  <option value="MANAGER" className="text-black">Manager</option>
-                </select>
-                
-                <div className="mt-2 p-3 bg-brand-surface-low border border-brand-border rounded-lg text-sm text-brand-text-muted">
-                  <p className="font-medium text-brand-text mb-1">Permissions Preview</p>
-                  {newRole === 'MANAGER' ? (
-                    <ul className="list-disc list-inside space-y-1">
-                      <li>Can create projects</li>
-                      <li>Can invite members</li>
-                      <li>Can edit tasks</li>
-                    </ul>
-                  ) : (
-                    <ul className="list-disc list-inside space-y-1">
-                      <li>Can view assigned projects</li>
-                      <li>Can update assigned tasks</li>
-                      <li>Cannot invite members</li>
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-2 flex gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={closeInviteModal}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium text-brand-text-muted hover:text-brand-text hover:bg-brand-surface-low transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isInvitingUser || !newEmail}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium bg-brand-primary hover:bg-brand-primary-hover text-white transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm cursor-pointer"
-                >
-                  {isInvitingUser ? <Loader2 size={16} className="animate-spin" /> : null}
-                  Send Invitation
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Revoke Invitation Modal */}
-      {invitationToRevoke && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setInvitationToRevoke(null)} />
-          <div className="bg-brand-surface border border-brand-border rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center flex flex-col items-center relative z-10 animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-14 h-14 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mb-5 ring-4 ring-red-500/5">
-              <UserX size={28} />
-            </div>
-            <h2 className="text-xl font-bold text-brand-text mb-2">Revoke Invitation?</h2>
-            <p className="text-sm text-brand-text-muted mb-8 leading-relaxed">
-              Are you sure you want to revoke the pending invitation for <span className="font-semibold text-brand-text">{invitationToRevoke.email}</span>? The invitation token will be permanently deleted and the user will not be able to activate an account with that link.
-            </p>
-            <div className="flex w-full gap-3">
-              <button
-                onClick={() => setInvitationToRevoke(null)}
-                disabled={isRevokingInvitation}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-brand-border text-sm font-medium hover:bg-brand-surface-low transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmRevokeInvitation}
-                disabled={isRevokingInvitation}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {isRevokingInvitation ? <Loader2 size={16} className="animate-spin" /> : null}
-                Revoke Invitation
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete User Confirmation */}
-      {userToDelete && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setUserToDelete(null)} />
-          <div className="bg-brand-surface border border-brand-border rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center flex flex-col items-center relative z-10 animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-14 h-14 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mb-5 ring-4 ring-red-500/5">
-              <AlertTriangle size={28} />
-            </div>
-            <h2 className="text-xl font-bold text-brand-text mb-2">Delete User?</h2>
-            <p className="text-sm text-brand-text-muted mb-8 leading-relaxed">
-              This action cannot be undone. This will permanently delete the user and their associated data from the platform.
-            </p>
-            <div className="flex w-full gap-3">
-              <button
-                onClick={() => setUserToDelete(null)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-brand-border text-sm font-medium hover:bg-brand-surface-low transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors shadow-sm cursor-pointer"
-              >
-                Yes, delete user
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteUserModal
+        userToDelete={userToDelete}
+        onClose={() => setUserToDelete(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 };
 
 export default UsersManagement;
+

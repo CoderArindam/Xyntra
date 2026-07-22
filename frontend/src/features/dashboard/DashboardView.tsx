@@ -14,6 +14,8 @@ import { ProjectCard } from '../../components/common/ProjectCard';
 import JoinMeetingModal from '../meeting/components/JoinMeetingModal';
 import {
   listRecentMeetingSessions,
+  deleteMeetingSession,
+  type MeetingSession,
 } from '../../services/meetingApi';
 import GlobalProposalsModal from '../proposals/components/GlobalProposalsModal';
 import { listOrgProposals } from '../../services/taskProposals';
@@ -33,6 +35,8 @@ import { StrategicProjectsWidget } from './components/StrategicProjectsWidget';
 import { FocusTasksWidget } from './components/FocusTasksWidget';
 import { SmartSuggestionsWidget } from './components/SmartSuggestionsWidget';
 import { RecentActivityWidget } from './components/RecentActivityWidget';
+import { QuickActionsWidget } from './components/QuickActionsWidget';
+import { RecentMeetingsWidget } from './components/RecentMeetingsWidget';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -53,7 +57,8 @@ export const DashboardView: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
-  const [, setRecentSessions] = useState<any[]>([]);
+  const [recentSessions, setRecentSessions] = useState<MeetingSession[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(false);
 
   const [isProposalsModalOpen, setIsProposalsModalOpen] = useState(false);
   const [pendingProposalsCount, setPendingProposalsCount] = useState<number>(4);
@@ -140,15 +145,26 @@ export const DashboardView: React.FC = () => {
     }
   }, [fetchProposalsCount, fetchSummaryData, fetchTimesheetSummary, canAccessAdminFeatures]);
 
-
   const fetchSessions = React.useCallback(async () => {
+    setIsLoadingSessions(true);
     try {
       const data = await listRecentMeetingSessions(5);
-      setRecentSessions(data);
+      setRecentSessions(data || []);
     } catch (err) {
       console.error('Failed to load recent meeting sessions:', err);
+    } finally {
+      setIsLoadingSessions(false);
     }
   }, []);
+
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
+      await deleteMeetingSession(sessionId);
+      setRecentSessions((prev) => prev.filter((s) => (s.id || s.session_id) !== sessionId));
+    } catch (err) {
+      console.error('Failed to delete session:', err);
+    }
+  };
 
   useEffect(() => {
     if (canAccessAdminFeatures) {
@@ -291,6 +307,15 @@ export const DashboardView: React.FC = () => {
 
             {/* RIGHT COLUMN (4 cols out of 12) */}
             <div className="lg:col-span-4 space-y-8">
+              {/* Quick Actions Widget */}
+              <QuickActionsWidget
+                userRole={user?.role || 'MEMBER'}
+                pendingPropsCount={pendingProposalsCount}
+                onOpenJoinModal={() => setIsJoinModalOpen(true)}
+                onOpenProposalsModal={() => setIsProposalsModalOpen(true)}
+                onOpenCreateProjectModal={openCreateProjectModal}
+              />
+
               {/* Focus Tasks Widget */}
               <FocusTasksWidget
                 pendingPropsCount={pendingProposalsCount}
@@ -307,6 +332,17 @@ export const DashboardView: React.FC = () => {
                   fetchProposalsCount();
                   fetchSummaryData();
                 }}
+              />
+
+              {/* Recent Meetings Widget */}
+              <RecentMeetingsWidget
+                sessions={recentSessions}
+                isLoading={isLoadingSessions}
+                onRetry={fetchSessions}
+                pendingPropsCount={pendingProposalsCount}
+                onDeleteSession={handleDeleteSession}
+                onOpenJoinModal={() => setIsJoinModalOpen(true)}
+                onOpenProposalsModal={() => setIsProposalsModalOpen(true)}
               />
 
               {/* Recent Activity Widget */}
@@ -358,3 +394,4 @@ export const DashboardView: React.FC = () => {
 };
 
 export default DashboardView;
+
