@@ -26,21 +26,21 @@ class TaskAssigneeUpdate(BaseModel):
 class CanonicalTaskResponse(BaseModel):
     id: int
     board_id: int
-    board_name: str
+    board_name: Optional[str] = ""
     organization_id: int
-    task_reference: str
+    task_reference: Optional[str] = ""
     column_id: int
-    column_name: str
-    column_type: str
-    is_completed: bool
+    column_name: Optional[str] = ""
+    column_type: Optional[str] = "TODO"
+    is_completed: Optional[bool] = False
     title: str
     description: Optional[str] = None
     priority: Optional[str] = None
     due_date: Optional[datetime] = None
     reminder_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     assigned_to: Optional[int] = None
     assignee_email: Optional[str] = None
@@ -64,3 +64,10 @@ class ColumnResponse(BaseModel):
 class BoardDataResponse(BaseModel):
     columns: List[ColumnResponse]
     tasks: List[CanonicalTaskResponse]
+
+class TaskSearchResponse(BaseModel):
+    items: List[CanonicalTaskResponse]
+    total: int
+    page: int
+    limit: int
+

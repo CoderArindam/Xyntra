@@ -1,6 +1,7 @@
 import React from 'react';
 import { Building, Plus } from 'lucide-react';
 import { type TimesheetPolicy } from '../../../../services/timesheetAdminService';
+import { type TimesheetEntry } from '../../../../services/timesheetService';
 import { TimeEntryRow } from '../TimeEntryRow';
 import type { BoardRowGroup } from '../../shared/types';
 
@@ -12,6 +13,8 @@ interface TimesheetBoardSectionProps {
   onHoursChange: (boardId: string, taskId: string | undefined, entryType: string, date: Date, hours: number) => void;
   onDescriptionChange: (boardId: string, taskId: string | undefined, entryType: string, date: Date, description: string) => void;
   onDelete: (entryId: string) => void;
+  onDeleteRow?: (entries: TimesheetEntry[]) => void;
+  onEditEntry?: (entry: TimesheetEntry) => void;
   onAddEntry: (boardId: string, boardName: string) => void;
 }
 
@@ -23,6 +26,8 @@ export const TimesheetBoardSection: React.FC<TimesheetBoardSectionProps> = ({
   onHoursChange,
   onDescriptionChange,
   onDelete,
+  onDeleteRow,
+  onEditEntry,
   onAddEntry,
 }) => {
   const groupTotalHours = group.rows.reduce(
@@ -75,6 +80,8 @@ export const TimesheetBoardSection: React.FC<TimesheetBoardSectionProps> = ({
             onDescriptionChange(group.boardId, row.taskId, row.entryType, date, desc)
           }
           onDelete={onDelete}
+          onDeleteRow={onDeleteRow ? () => onDeleteRow(row.entries) : undefined}
+          onEditEntry={onEditEntry}
         />
       ))}
     </React.Fragment>

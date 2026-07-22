@@ -89,7 +89,15 @@ export const ApprovalQueuePage: React.FC = () => {
       if (selectedBoardId) params.board_id = selectedBoardId;
 
       const items = await getApprovalQueue(params);
-      setQueueItems(items);
+      const sorted = [...items].sort((a, b) => {
+        const timeA = a.submitted_at ? new Date(a.submitted_at).getTime() : 0;
+        const timeB = b.submitted_at ? new Date(b.submitted_at).getTime() : 0;
+        if (timeB !== timeA) return timeB - timeA;
+        const dateA = a.week_start_date ? new Date(a.week_start_date).getTime() : 0;
+        const dateB = b.week_start_date ? new Date(b.week_start_date).getTime() : 0;
+        return dateB - dateA;
+      });
+      setQueueItems(sorted);
       setCurrentPage(1); // Reset page on filter change
     } catch (err: any) {
       setQueueError(err.response?.data?.detail || 'Failed to load approval queue');

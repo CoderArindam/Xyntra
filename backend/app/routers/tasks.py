@@ -3,7 +3,7 @@ from typing import Optional, List
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 
-from app.schemas.task import TaskCreate, TaskUpdate, TaskAssigneeUpdate, CanonicalTaskResponse, BoardDataResponse
+from app.schemas.task import TaskCreate, TaskUpdate, TaskAssigneeUpdate, CanonicalTaskResponse, BoardDataResponse, TaskSearchResponse
 from app.schemas.envelope import DataEnvelope
 from app.services.notification_service import dispatch_task_email
 from app.auth.dependencies import get_current_user
@@ -17,6 +17,26 @@ router = APIRouter(tags=["Tasks"])
 def get_task_service(conn: asyncpg.Connection = Depends(get_db_connection)) -> TaskService:
     return TaskService(conn)
 
+@router.get("/tasks/search", response_model=DataEnvelope[TaskSearchResponse])
+async def search_tasks(
+    query: Optional[str] = Query(default=None),
+    board_id: Optional[str] = Query(default=None),
+    assigned_to_me: bool = Query(default=True),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user),
+    task_service: TaskService = Depends(get_task_service)
+):
+    result = await task_service.search_tasks(
+        current_user=current_user,
+        query=query,
+        board_id=board_id,
+        assigned_to_me=assigned_to_me,
+        page=page,
+        limit=limit,
+    )
+    return DataEnvelope(data=TaskSearchResponse(**result))
+
 @router.post("/tasks", response_model=DataEnvelope[CanonicalTaskResponse])
 async def create_task(
     task_in: TaskCreate,
@@ -25,6 +45,7 @@ async def create_task(
 ):
     task = await task_service.create_task(task_in, current_user)
     return DataEnvelope(data=task)
+
 
 
 @router.get("/boards/{board_id}/tasks", response_model=DataEnvelope[BoardDataResponse])

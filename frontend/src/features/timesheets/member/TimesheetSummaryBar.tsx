@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, CheckCircle2, RotateCcw, Send } from "lucide-react";
+import { AlertTriangle, RotateCcw, Send } from "lucide-react";
 import type {
   Timesheet,
   TimesheetDetail,
@@ -65,23 +65,16 @@ export const TimesheetSummaryBar: React.FC<TimesheetSummaryBarProps> = ({
       )
     : "";
 
-  // Total status color
-  let totalColorClass = "text-brand-text-muted";
-  if (totalHours === targetHours) {
-    totalColorClass = "text-emerald-400 font-bold";
-  } else if (totalHours > targetHours) {
-    totalColorClass = "text-red-400 font-bold";
-  }
-
   const statusUpper = (timesheet.status || "").toUpperCase();
   const isRejected = statusUpper === "REJECTED";
   const isSubmitted = statusUpper === "SUBMITTED";
   const isApproved = statusUpper === "APPROVED";
   const isDraft = statusUpper === "DRAFT";
 
+  const progressPercent = Math.min(100, Math.max(0, (totalHours / targetHours) * 100));
 
   return (
-    <div className="sticky bottom-0 z-30 w-full bg-brand-surface/95 backdrop-blur-md border-t border-brand-border shadow-2xl transition-all">
+    <div className="sticky bottom-0 z-30 w-full bg-brand-surface border-t border-brand-border shadow-xl transition-all rounded-b-xl overflow-hidden">
       {/* Rejected Banner */}
       {isRejected && timesheet.approver_comment && (
         <div className="bg-red-500/15 border-b border-red-500/30 px-6 py-2 flex items-center gap-2 text-xs text-red-300">
@@ -93,64 +86,37 @@ export const TimesheetSummaryBar: React.FC<TimesheetSummaryBarProps> = ({
         </div>
       )}
 
-      <div className="px-6 py-3 flex flex-wrap items-center justify-between gap-4">
-        {/* Left: Week Date Range & Status */}
-        <div className="flex items-center gap-3">
+      <div className="px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-6">
+        {/* Left: Status chip & Week range label */}
+        <div className="flex items-center gap-3 shrink-0">
           {getStatusBadge(timesheet.status)}
-          <div className="text-sm font-semibold text-brand-text">
+          <div className="text-xs font-semibold text-brand-text">
             Week of {startDateStr} – {endDateStr}
           </div>
         </div>
 
-        {/* Center: 7 Day Columns Live Totals */}
-        <div className="hidden md:flex items-center gap-2">
-          {dayTotals.map((hrs, idx) => {
-            const dateObj = weekDates[idx];
-            const dayLabel = dateObj
-              ? dateObj.toLocaleDateString("en-US", { weekday: "narrow" })
-              : ["M", "T", "W", "T", "F", "S", "S"][idx];
-
-            const std = policy.standard_hours_per_day || 8;
-            const max = policy.max_hours_per_day || 24;
-
-            let colColor = "bg-brand-surface-low text-brand-text-muted/60";
-            if (hrs > max) {
-              colColor = "bg-red-500/20 text-red-400 border border-red-500/30";
-            } else if (hrs > std) {
-              colColor =
-                "bg-amber-500/20 text-amber-300 border border-amber-500/30";
-            } else if (hrs > 0) {
-              colColor =
-                "bg-blue-500/20 text-blue-300 border border-blue-500/30";
-            }
-
-            return (
-              <div
-                key={idx}
-                className={`flex flex-col items-center justify-center w-11 h-10 rounded text-center transition-colors ${colColor}`}
-              >
-                <span className="text-[10px] uppercase font-bold opacity-75">
-                  {dayLabel}
-                </span>
-                <span className="text-xs font-mono font-semibold">
-                  {hrs > 0 ? hrs.toFixed(1) : "—"}
-                </span>
-              </div>
-            );
-          })}
+        {/* Center: Weekly Progress Bar */}
+        <div className="flex flex-col gap-1.5 w-full sm:max-w-md flex-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-brand-text-muted uppercase tracking-wider text-[10px]">
+              WEEKLY PROGRESS
+            </span>
+            <span className="font-mono font-bold text-brand-text text-xs">
+              {totalHours.toFixed(1)} / {targetHours.toFixed(1)} hrs
+            </span>
+          </div>
+          <div className="w-full bg-brand-surface-low h-2.5 rounded-full overflow-hidden border border-brand-border/40">
+            <div
+              className="bg-brand-primary h-full rounded-full transition-all duration-300 shadow-sm"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
         </div>
 
-        {/* Right: Total & Action Button */}
-        <div className="flex items-center gap-6">
-          <div className="text-sm font-medium">
-            <span className="text-brand-text-muted mr-1.5">Total:</span>
-            <span className={`font-mono text-base ${totalColorClass}`}>
-              {totalHours.toFixed(1)}
-            </span>
-            <span className="text-brand-text-muted text-xs">
-              {" "}
-              / {targetHours.toFixed(1)} hrs
-            </span>
+        {/* Right: Total & Primary Submit / Recall Button */}
+        <div className="flex items-center gap-4 shrink-0 justify-end w-full sm:w-auto">
+          <div className="text-sm font-semibold text-brand-text">
+            Total: <span className="font-mono font-bold">{totalHours.toFixed(1)} hrs</span>
           </div>
 
           <div>
@@ -160,7 +126,7 @@ export const TimesheetSummaryBar: React.FC<TimesheetSummaryBarProps> = ({
                 size="md"
                 onClick={onSubmit}
                 disabled={isSubmitting || totalHours === 0}
-                className="flex items-center gap-2 shadow-lg shadow-brand-primary/20"
+                className="flex items-center gap-2 px-5 py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white font-semibold text-xs rounded-xl shadow-md cursor-pointer"
               >
                 <Send size={15} />
                 <span>
@@ -175,18 +141,17 @@ export const TimesheetSummaryBar: React.FC<TimesheetSummaryBarProps> = ({
                 size="md"
                 onClick={onRecall}
                 disabled={isSubmitting}
-                className="flex items-center gap-2 border-amber-500/50 text-amber-300 hover:bg-amber-500/10"
+                className="flex items-center gap-2 border-amber-500/50 text-amber-300 hover:bg-amber-500/10 cursor-pointer"
               >
                 <RotateCcw size={15} />
-                <span>{isSubmitting ? "Recalling..." : "Recall"}</span>
+                <span>Recall Timesheet</span>
               </Button>
             )}
 
             {isApproved && (
-              <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                <CheckCircle2 size={16} />
-                <span>Approved</span>
-              </div>
+              <Badge variant="success" size="md" className="px-3 py-1 text-xs">
+                APPROVED
+              </Badge>
             )}
           </div>
         </div>
@@ -194,5 +159,3 @@ export const TimesheetSummaryBar: React.FC<TimesheetSummaryBarProps> = ({
     </div>
   );
 };
-
-export default TimesheetSummaryBar;

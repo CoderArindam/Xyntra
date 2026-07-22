@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { AlertTriangle, FolderPlus, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { AlertTriangle, FolderPlus, Loader2, Clock } from 'lucide-react';
 import {
   type TimesheetDetail,
+  type TimesheetEntry,
   getTimesheetDetail,
   deleteEntry,
   submitTimesheet,
@@ -22,15 +24,18 @@ import { AddEntryModal } from './modals/AddEntryModal';
 import { LogEffortModal } from './modals/LogEffortModal';
 import { SubmitTimesheetModal } from './modals/SubmitTimesheetModal';
 import { RecallTimesheetModal } from './modals/RecallTimesheetModal';
+import { EditEntryModal } from './modals/EditEntryModal';
 
 export interface TimesheetWeekViewProps {
   timesheetId: string;
   onStatusChange?: (newStatus: string) => void;
+  onRegisterLogEffortTrigger?: (fn: () => void) => void;
 }
 
 export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
   timesheetId,
   onStatusChange,
+  onRegisterLogEffortTrigger,
 }) => {
   const [detail, setDetail] = useState<TimesheetDetail | null>(null);
   const [policy, setPolicy] = useState<TimesheetPolicy | null>(null);
@@ -44,6 +49,7 @@ export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
   const [showAddBoardModal, setShowAddBoardModal] = useState(false);
   const [showAddEntryModal, setShowAddEntryModal] = useState<{ boardId: string; boardName: string } | null>(null);
   const [showLogEffortModal, setShowLogEffortModal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<TimesheetEntry | null>(null);
 
   // Form state
   const [memberNote, setMemberNote] = useState('');
@@ -82,6 +88,7 @@ export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
     policy,
     onDetailUpdate: setDetail,
     onStatusChange,
+    onError: (msg) => setApiError(parseTimesheetError(msg)),
   });
 
   const loadData = useCallback(async () => {
@@ -107,6 +114,12 @@ export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
+    if (onRegisterLogEffortTrigger) {
+      onRegisterLogEffortTrigger(() => handleOpenLogEffortModal());
+    }
+  }, [onRegisterLogEffortTrigger]);
+
+  useEffect(() => {
     if (showSubmitModal) {
       setLoadingApprovers(true);
       getEligibleApprovers()
@@ -120,7 +133,7 @@ export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
   }, [showSubmitModal]);
 
   const weekDates = detail?.week_start_date ? buildWeekDates(detail.week_start_date) : [];
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = toDateStr(new Date());
 
   const boardGroups = detail ? groupEntriesByBoard(detail) : [];
 
@@ -193,9 +206,48 @@ export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
       await deleteEntry(timesheetId, entryId);
       const updated = await getTimesheetDetail(timesheetId);
       setDetail(updated);
-    } catch (err) {
-      console.error('Delete entry failed:', err);
+    } catch (err: any) {
+      console.error(err);
     }
+  };
+
+  const handleDeleteRow = async (entries: TimesheetEntry[]) => {
+    if (!detail) return;
+    for (const entry of entries) {
+      if (entry.id && !entry.id.startsWith('temp_')) {
+        try {
+          await deleteEntry(timesheetId, entry.id);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    try {
+      const updated = await getTimesheetDetail(timesheetId);
+      setDetail(updated);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveEditEntry = (data: {
+    entryId?: string;
+    boardId?: string;
+    taskId?: string;
+    entryDate: string;
+    hours: number;
+    entryType: string;
+    description?: string;
+  }) => {
+    enqueueChange({
+      board_id: data.boardId,
+      task_id: data.taskId,
+      entry_date: data.entryDate,
+      hours: data.hours,
+      entry_type: data.entryType,
+      description: data.description,
+    });
+    setEditingEntry(null);
   };
 
   const handleConfirmSubmit = async () => {
@@ -211,9 +263,12 @@ export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
       setShowSubmitModal(false);
       setMemberNote('');
       setSelectedApproverId('auto');
+      toast.success('Timesheet submitted successfully for approval!');
     } catch (err: any) {
-      setApiError(parseTimesheetError(err));
+      const parsed = parseTimesheetError(err);
+      setApiError(parsed);
       setShowSubmitModal(false);
+      toast.error(parsed?.detail || 'Failed to submit timesheet');
     } finally {
       setIsActionLoading(false);
     }
@@ -229,9 +284,12 @@ export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
       if (onStatusChange) onStatusChange(res.status);
       setShowRecallModal(false);
       setRecallReason('');
+      toast.success('Timesheet recalled successfully.');
     } catch (err: any) {
-      setApiError(parseTimesheetError(err));
+      const parsed = parseTimesheetError(err);
+      setApiError(parsed);
       setShowRecallModal(false);
+      toast.error(parsed?.detail || 'Failed to recall timesheet');
     } finally {
       setIsActionLoading(false);
     }
@@ -261,8 +319,9 @@ export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
   };
 
   const handleOpenLogEffortModal = async (initialBoardId?: string) => {
-    const todayISO = new Date().toISOString().split('T')[0];
-    const defaultDate = detail?.week_start_date || todayISO;
+    const todayISO = toDateStr(new Date());
+    const isTodayInWeek = weekDates.some((d) => toDateStr(d) === todayISO);
+    const defaultDate = isTodayInWeek ? todayISO : (detail?.week_start_date || todayISO);
     const bId = initialBoardId || (accessibleBoards.length > 0 ? String(accessibleBoards[0].id) : 'general');
     setLogEffortBoardId(bId);
     setLogEffortEntryType('task');
@@ -345,26 +404,29 @@ export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
       <div className="w-full overflow-x-auto bg-brand-surface border border-brand-border rounded-xl shadow-lg">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-brand-border bg-brand-surface-low/60 text-xs font-semibold text-brand-text-muted">
-              <th className="py-3 px-4 min-w-[220px]">Work Item / Board</th>
-              {weekDates.map((date) => {
-                const dateKey = date.toISOString().split('T')[0];
+            <tr className="border-b border-brand-border bg-brand-surface-low/60 text-[11px] font-bold text-brand-text-muted uppercase tracking-wider">
+              <th className="py-3.5 px-4 text-left min-w-[240px]">PROJECT / TASK</th>
+              {weekDates.map((date, idx) => {
+                const dateKey = toDateStr(date);
                 const isToday = dateKey === todayStr;
-                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
                 const dayNum = date.getDate();
+                const hrs = dayTotals[idx] || 0;
                 return (
                   <th
                     key={dateKey}
-                    className={`py-3 px-2 text-center min-w-[64px] ${isToday ? 'bg-brand-primary/10 text-brand-primary font-bold' : ''}`}
+                    className={`py-2.5 px-2 text-center min-w-[64px] ${isToday ? 'bg-brand-primary/10 text-brand-primary font-bold' : ''}`}
                   >
-                    <div className="text-[11px] uppercase tracking-wider">{dayName}</div>
-                    <div className={`text-xs mt-0.5 ${isToday ? 'text-brand-primary' : 'text-brand-text'}`}>
-                      {dayNum}
+                    <div className="text-[11px] font-bold tracking-wider">{dayName} {dayNum}</div>
+                    <div className={`text-[10px] font-mono mt-0.5 ${
+                      hrs > 0 ? (isToday ? 'text-brand-primary font-bold' : 'text-brand-text font-bold') : 'text-brand-text-muted/60'
+                    }`}>
+                      {hrs > 0 ? `${hrs.toFixed(1)}h` : '—'}
                     </div>
                   </th>
                 );
               })}
-              <th className="py-3 px-4 text-right min-w-[80px]">Total</th>
+              <th className="py-3.5 px-4 text-right min-w-[80px]">TOTAL</th>
             </tr>
           </thead>
 
@@ -379,6 +441,8 @@ export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
                 onHoursChange={handleHoursChange}
                 onDescriptionChange={handleDescriptionChange}
                 onDelete={handleDeleteEntry}
+                onDeleteRow={handleDeleteRow}
+                onEditEntry={(entry) => setEditingEntry(entry)}
                 onAddEntry={handleOpenAddEntry}
               />
             ))}
@@ -401,6 +465,41 @@ export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
               </tr>
             )}
           </tbody>
+
+          {boardGroups.length > 0 && (
+            <tfoot className="border-t-2 border-brand-border/80 bg-brand-surface-low/80 font-semibold text-xs">
+              <tr>
+                <td className="py-3 px-4 text-left font-bold text-brand-text flex items-center gap-1.5">
+                  <Clock size={14} className="text-brand-primary" />
+                  <span>DAILY TOTAL</span>
+                </td>
+                {dayTotals.map((hrs, idx) => {
+                  const isOverMax = hrs > (policy.max_hours_per_day || 24);
+                  const isOverStd = hrs > (policy.standard_hours_per_day || 8);
+                  return (
+                    <td key={idx} className="py-3 px-2 text-center font-mono font-bold">
+                      <span
+                        className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
+                          hrs === 0
+                            ? 'text-brand-text-muted/40'
+                            : isOverMax
+                              ? 'bg-red-500/20 text-red-400 border border-red-500/40'
+                              : isOverStd
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-brand-primary/10 text-brand-primary border border-brand-primary/20'
+                        }`}
+                      >
+                        {hrs > 0 ? `${hrs.toFixed(1)}h` : '0h'}
+                      </span>
+                    </td>
+                  );
+                })}
+                <td className="py-3 px-4 text-right font-mono font-bold text-brand-primary text-sm">
+                  {detail.total_hours.toFixed(1)} hrs
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
 
         {!readOnly && boardGroups.length > 0 && (
@@ -470,6 +569,21 @@ export const TimesheetWeekView: React.FC<TimesheetWeekViewProps> = ({
         onDescriptionChange={setLogEffortDescription}
         onSave={handleSaveLogEffort}
       />
+
+      {editingEntry && (
+        <EditEntryModal
+          isOpen={Boolean(editingEntry)}
+          onClose={() => setEditingEntry(null)}
+          entry={editingEntry}
+          accessibleBoards={accessibleBoards}
+          boardTasksMap={boardTasksMap}
+          loadingTasks={loadingTasks}
+          onLoadTasks={loadBoardTasks}
+          weekDates={weekDates}
+          onSave={handleSaveEditEntry}
+          onDelete={handleDeleteEntry}
+        />
+      )}
 
       <SubmitTimesheetModal
         isOpen={showSubmitModal}

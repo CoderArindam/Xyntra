@@ -20,6 +20,14 @@ async def main():
         await conn.execute(f.read())
     print('Applied 043_timesheet_views.sql')
 
+    with open('../database/migrations/046_enforce_task_assignment_timesheets.sql', 'r') as f:
+        await conn.execute(f.read())
+    print('Applied 046_enforce_task_assignment_timesheets.sql')
+
+    with open('../database/migrations/047_fix_rejected_timesheet_status.sql', 'r') as f:
+        await conn.execute(f.read())
+    print('Applied 047_fix_rejected_timesheet_status.sql')
+
     await conn.close()
 
 if __name__ == '__main__':

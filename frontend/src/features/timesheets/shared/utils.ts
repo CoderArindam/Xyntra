@@ -21,6 +21,39 @@ export function toDateStr(date: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/** Format week_start_date for top week tabs (e.g. "July 20-26" or "July 27-Aug 2"). */
+export function formatWeekTabLabel(weekStartDate: string): string {
+  if (!weekStartDate) return '';
+  const start = new Date(weekStartDate + 'T00:00:00');
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
+  const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
+
+  if (startMonth === endMonth) {
+    return `${startMonth} ${start.getDate()}-${end.getDate()}`;
+  }
+  return `${startMonth} ${start.getDate()}-${endMonth} ${end.getDate()}`;
+}
+
+/** Format week_start_date for main header pill (e.g. "Week of July 20 - July 26, 2026"). */
+export function formatWeekHeaderLabel(weekStartDate: string): string {
+  if (!weekStartDate) return '';
+  const start = new Date(weekStartDate + 'T00:00:00');
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  const startMonth = start.toLocaleDateString('en-US', { month: 'long' });
+  const endMonth = end.toLocaleDateString('en-US', { month: 'long' });
+  const year = start.getFullYear();
+
+  if (startMonth === endMonth) {
+    return `Week of ${startMonth} ${start.getDate()} - ${end.getDate()}, ${year}`;
+  }
+  return `Week of ${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${year}`;
+}
+
 /** Group timesheet entries by board and work item. */
 export function groupEntriesByBoard(detail: TimesheetDetail): BoardRowGroup[] {
   const boardGroupsMap = new Map<string, BoardRowGroup>();

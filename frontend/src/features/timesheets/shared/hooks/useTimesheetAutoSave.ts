@@ -14,6 +14,7 @@ interface UseTimesheetAutoSaveOptions {
   policy: TimesheetPolicy | null;
   onDetailUpdate: (detail: TimesheetDetail) => void;
   onStatusChange?: (status: string) => void;
+  onError?: (errorMsg: string) => void;
 }
 
 export function useTimesheetAutoSave({
@@ -23,6 +24,7 @@ export function useTimesheetAutoSave({
   policy,
   onDetailUpdate,
   onStatusChange,
+  onError,
 }: UseTimesheetAutoSaveOptions) {
   const [pendingQueue, setPendingQueue] = useState<Map<string, UpsertEntryRequest>>(new Map());
   const [isSaving, setIsSaving] = useState(false);
@@ -49,11 +51,20 @@ export function useTimesheetAutoSave({
         setTimeout(() => setSaveSuccess(false), 2000);
       } catch (err: any) {
         console.error('Auto-save error:', err);
+        const detailErr = err.response?.data?.detail;
+        const msg = typeof detailErr === 'object' && detailErr?.detail
+          ? detailErr.detail
+          : (typeof detailErr === 'string' ? detailErr : 'Failed to save timesheet entry');
+        if (onError) onError(msg);
+        try {
+          const reverted = await getTimesheetDetail(timesheetId);
+          onDetailUpdate(reverted);
+        } catch (_) {}
       } finally {
         setIsSaving(false);
       }
     },
-    [timesheetId, onStatusChange, readOnly, onDetailUpdate]
+    [timesheetId, onStatusChange, readOnly, onDetailUpdate, onError]
   );
 
   const enqueueChange = useCallback(

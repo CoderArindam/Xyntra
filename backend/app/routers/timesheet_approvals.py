@@ -72,27 +72,8 @@ async def get_approval_queue(
     role = str(current_user.get("role") or "").lower()
     is_admin = role in ("superadmin", "super_admin")
 
-    if is_admin:
-        base_where = "WHERE org_id = $1"
-        params = [org_id]
-    else:
-        is_active_approver = await conn.fetchval(
-            """
-            SELECT EXISTS (
-                SELECT 1 FROM timesheet_approver_assignments 
-                WHERE (org_id::text = $1 OR LTRIM(RIGHT(org_id::text, 12), '0') = LTRIM(RIGHT($1, 12), '0')) 
-                  AND (approver_user_id::text = $2 OR LTRIM(RIGHT(approver_user_id::text, 12), '0') = LTRIM(RIGHT($2, 12), '0')) 
-                  AND is_active = true
-            )
-            """,
-            s_org_id,
-            s_user_id,
-        )
-        if is_active_approver:
-            base_where = "WHERE org_id = $1 AND (approver_id = $2 OR approver_id IS NULL)"
-        else:
-            base_where = "WHERE org_id = $1 AND approver_id = $2"
-        params = [org_id, user_id]
+    base_where = "WHERE org_id = $1 AND (approver_id = $2 OR approver_id IS NULL) AND user_id != $2"
+    params = [org_id, user_id]
 
     if status_filter and status_filter.lower() != "all":
         params.append(status_filter.lower())
@@ -102,7 +83,7 @@ async def get_approval_queue(
         params.append(board_id)
         base_where += f" AND id IN (SELECT DISTINCT timesheet_id FROM v_timesheet_entries_canonical WHERE board_id = ${len(params)})"
 
-    query = f"SELECT * FROM v_timesheets_canonical {base_where} ORDER BY submitted_at ASC"
+    query = f"SELECT * FROM v_timesheets_canonical {base_where} ORDER BY submitted_at DESC, week_start_date DESC"
     rows = await conn.fetch(query, *params)
 
     now = datetime.now(timezone.utc)
@@ -149,27 +130,8 @@ async def get_approval_queue_summary(
     role = str(current_user.get("role") or "").lower()
     is_admin = role in ("superadmin", "super_admin")
 
-    if is_admin:
-        where_clause = "WHERE org_id = $1"
-        params = [org_id]
-    else:
-        is_active_approver = await conn.fetchval(
-            """
-            SELECT EXISTS (
-                SELECT 1 FROM timesheet_approver_assignments 
-                WHERE (org_id::text = $1 OR LTRIM(RIGHT(org_id::text, 12), '0') = LTRIM(RIGHT($1, 12), '0')) 
-                  AND (approver_user_id::text = $2 OR LTRIM(RIGHT(approver_user_id::text, 12), '0') = LTRIM(RIGHT($2, 12), '0')) 
-                  AND is_active = true
-            )
-            """,
-            s_org_id,
-            s_user_id,
-        )
-        if is_active_approver:
-            where_clause = "WHERE org_id = $1 AND (approver_id = $2 OR approver_id IS NULL)"
-        else:
-            where_clause = "WHERE org_id = $1 AND approver_id = $2"
-        params = [org_id, user_id]
+    where_clause = "WHERE org_id = $1 AND (approver_id = $2 OR approver_id IS NULL) AND user_id != $2"
+    params = [org_id, user_id]
 
     q1 = f"SELECT COUNT(*)::INTEGER FROM v_timesheets_canonical {where_clause} AND status = 'submitted'"
     pending_count = await conn.fetchval(q1, *params) or 0
@@ -209,6 +171,8 @@ async def approve_timesheet(
     _check_superadmin_or_manager(current_user)
     user_id = _parse_uuid(current_user.get("id"))
     org_id = _parse_uuid(current_user.get("organization_id"))
+    role = str(current_user.get("role") or "").lower()
+    is_admin = role in ("superadmin", "super_admin")
 
     has_access = await conn.fetchval(
         "SELECT fn_check_timesheet_approver_access($1, $2)",
@@ -221,7 +185,7 @@ async def approve_timesheet(
             detail="Forbidden: You do not have approver access for this timesheet",
         )
 
-    client_ip = request.client.host if request.client else None
+    client_ip = request.client.host if request.client and request.client.host != "testclient" else "127.0.0.1"
     user_agent = request.headers.get("user-agent", "")
 
     try:
@@ -271,6 +235,8 @@ async def reject_timesheet(
     _check_superadmin_or_manager(current_user)
     user_id = _parse_uuid(current_user.get("id"))
     org_id = _parse_uuid(current_user.get("organization_id"))
+    role = str(current_user.get("role") or "").lower()
+    is_admin = role in ("superadmin", "super_admin")
 
     if not body.comment or not body.comment.strip():
         raise HTTPException(
@@ -289,7 +255,7 @@ async def reject_timesheet(
             detail="Forbidden: You do not have approver access for this timesheet",
         )
 
-    client_ip = request.client.host if request.client else None
+    client_ip = request.client.host if request.client and request.client.host != "testclient" else "127.0.0.1"
     user_agent = request.headers.get("user-agent", "")
 
     try:

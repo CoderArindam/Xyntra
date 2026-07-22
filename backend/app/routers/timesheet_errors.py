@@ -17,6 +17,9 @@ TIMESHEET_ERROR_MAP: Dict[str, Tuple[int, str]] = {
     'INVALID_APPROVER_ROLE': (422, "The selected approver must be a Manager or Superadmin. Members cannot be assigned as approvers."),
     'BOARD_ORG_MISMATCH': (403, "The selected board does not belong to your organization."),
     'TIMESHEET_LOCKED': (422, "This timesheet is locked and cannot be modified after submission."),
+    'TASK_NOT_ASSIGNED': (422, "Time can only be logged against tasks assigned to you."),
+    'TASK_NOT_FOUND': (404, "The specified task was not found."),
+    'TASK_LINK_REQUIRED': (422, "Task selection is required by your organization's timesheet policy."),
 }
 
 

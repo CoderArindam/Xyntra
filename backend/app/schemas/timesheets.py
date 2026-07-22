@@ -53,7 +53,22 @@ class TimesheetEntryResponse(BaseModel):
     hours: float
     entry_type: str
     description: Optional[str] = None
-    is_overtime: bool
+    is_overtime: Optional[bool] = False
+
+    @field_validator('id', 'timesheet_id', 'board_id', 'task_id', mode='before')
+    @classmethod
+    def parse_uuid_fields(cls, v):
+        if v is None or v == '':
+            return None
+        if isinstance(v, UUID):
+            return v
+        s_val = str(v).strip()
+        if s_val.isdigit():
+            return UUID(f"00000000-0000-0000-0000-{int(s_val):012d}")
+        try:
+            return UUID(s_val)
+        except Exception:
+            return None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -96,8 +111,14 @@ class UpsertTimesheetEntryRequest(BaseModel):
         if isinstance(v, UUID):
             return v
         s_val = str(v).strip()
+        if s_val.startswith('#'):
+            s_val = s_val[1:]
         if s_val.isdigit():
             return UUID(f"00000000-0000-0000-0000-{int(s_val):012d}")
+        if '-' in s_val:
+            parts = s_val.split('-')
+            if len(parts) == 2 and parts[1].isdigit():
+                return UUID(f"00000000-0000-0000-0000-{int(parts[1]):012d}")
         try:
             return UUID(s_val)
         except Exception:

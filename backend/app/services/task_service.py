@@ -207,3 +207,65 @@ class TaskService:
         except Exception as e:
             logger.error(f"Error updating task assignee: {e}")
             raise HTTPException(status_code=400, detail="An unexpected error occurred")
+
+    async def search_tasks(
+        self,
+        current_user: dict,
+        query: Optional[str] = None,
+        board_id: Optional[str] = None,
+        assigned_to_me: bool = True,
+        page: int = 1,
+        limit: int = 20,
+    ) -> dict:
+        try:
+            org_id = current_user.get("organization_id")
+            user_id = current_user.get("id")
+
+            where_clauses = ["(organization_id::text = $1 OR LTRIM(RIGHT(organization_id::text, 12), '0') = LTRIM(RIGHT($1, 12), '0'))"]
+            params: list[Any] = [str(org_id)]
+            idx = 2
+
+            if assigned_to_me and user_id:
+                where_clauses.append(f"(assigned_to::text = ${idx} OR LTRIM(RIGHT(assigned_to::text, 12), '0') = LTRIM(RIGHT(${idx}, 12), '0'))")
+                params.append(str(user_id))
+                idx += 1
+
+            if board_id and board_id != "general":
+                where_clauses.append(f"(board_id::text = ${idx} OR LTRIM(RIGHT(board_id::text, 12), '0') = LTRIM(RIGHT(${idx}, 12), '0'))")
+                params.append(str(board_id))
+                idx += 1
+
+            if query and query.strip():
+                clean_q = f"%{query.strip()}%"
+                where_clauses.append(
+                    f"(title ILIKE ${idx} OR task_reference ILIKE ${idx} OR board_name ILIKE ${idx} OR COALESCE(description, '') ILIKE ${idx})"
+                )
+                params.append(clean_q)
+                idx += 1
+
+            where_sql = " AND ".join(where_clauses)
+
+            count_sql = f"SELECT COUNT(*) FROM v_tasks_canonical WHERE {where_sql}"
+            total = await self.conn.fetchval(count_sql, *params)
+
+            offset = (page - 1) * limit
+            data_sql = f"""
+                SELECT * FROM v_tasks_canonical
+                WHERE {where_sql}
+                ORDER BY created_at DESC
+                LIMIT ${idx} OFFSET ${idx+1}
+            """
+            data_params = list(params) + [limit, offset]
+
+            rows = await self.conn.fetch(data_sql, *data_params)
+            items = [dict(r) for r in rows]
+
+            return {
+                "items": items,
+                "total": total or 0,
+                "page": page,
+                "limit": limit,
+            }
+        except Exception as e:
+            logger.error(f"Error searching tasks: {e}")
+            raise HTTPException(status_code=400, detail="An unexpected error occurred while searching tasks")

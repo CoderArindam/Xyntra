@@ -78,3 +78,22 @@ export const updateTask = async (
   return response.data.data;
 };
 
+export interface TaskSearchResult {
+  items: Task[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export const searchTasks = async (params: {
+  query?: string;
+  board_id?: string | number;
+  assigned_to_me?: boolean;
+  page?: number;
+  limit?: number;
+}): Promise<TaskSearchResult> => {
+  const response = await api.get('/tasks/search', { params });
+  return response.data.data;
+};
+
+

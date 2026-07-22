@@ -10,6 +10,7 @@ import {
   Calendar,
   History,
   FileText,
+  Clock,
 } from 'lucide-react';
 import {
   getTimesheetDetail,
@@ -28,7 +29,7 @@ import TimeEntryRow from '../member/TimeEntryRow';
 import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { TimesheetErrorBanner, parseTimesheetError, type TimesheetApiError } from '../shared/TimesheetErrorBanner';
-import { groupEntriesByBoard, buildWeekDates } from '../shared/utils';
+import { groupEntriesByBoard, buildWeekDates, toDateStr } from '../shared/utils';
 
 export interface TimesheetReviewModalProps {
   timesheetId: string;
@@ -168,6 +169,14 @@ export const TimesheetReviewModal: React.FC<TimesheetReviewModalProps> = ({
   const stdHours = effectivePolicy.standard_hours_per_week;
   const deltaHours = totalHours - stdHours;
 
+  const dayTotals = weekDates.map((date) => {
+    const dateStr = toDateStr(date);
+    return detail?.entries.reduce((sum, e) => {
+      if (e.entry_date.split('T')[0] === dateStr) return sum + (Number(e.hours) || 0);
+      return sum;
+    }, 0) || 0;
+  });
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
       <div className="bg-brand-surface border border-brand-border rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">
@@ -269,20 +278,25 @@ export const TimesheetReviewModal: React.FC<TimesheetReviewModalProps> = ({
                 <div className="w-full overflow-x-auto bg-brand-surface border border-brand-border rounded-xl">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-brand-border bg-brand-surface-low/60 text-xs font-semibold text-brand-text-muted">
-                        <th className="py-3 px-4 min-w-[220px]">Work Item / Board</th>
-                        {weekDates.map((date) => {
-                          const dateKey = date.toISOString().split('T')[0];
-                          const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                      <tr className="border-b border-brand-border bg-brand-surface-low/60 text-[11px] font-bold text-brand-text-muted uppercase tracking-wider">
+                        <th className="py-3 px-4 min-w-[220px]">PROJECT / TASK</th>
+                        {weekDates.map((date, idx) => {
+                          const dateKey = toDateStr(date);
+                          const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
                           const dayNum = date.getDate();
+                          const hrs = dayTotals[idx] || 0;
                           return (
-                            <th key={dateKey} className="py-3 px-2 text-center min-w-[60px]">
-                              <div className="text-[10px] uppercase tracking-wider">{dayName}</div>
-                              <div className="text-xs font-semibold text-brand-text mt-0.5">{dayNum}</div>
+                            <th key={dateKey} className="py-2.5 px-2 text-center min-w-[60px]">
+                              <div className="text-[11px] font-bold tracking-wider">{dayName} {dayNum}</div>
+                              <div className={`text-[10px] font-mono mt-0.5 ${
+                                hrs > 0 ? 'text-brand-text font-bold' : 'text-brand-text-muted/60'
+                              }`}>
+                                {hrs > 0 ? `${hrs.toFixed(1)}h` : '—'}
+                              </div>
                             </th>
                           );
                         })}
-                        <th className="py-3 px-4 text-right min-w-[70px]">Total</th>
+                        <th className="py-3 px-4 text-right min-w-[70px]">TOTAL</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -314,6 +328,40 @@ export const TimesheetReviewModal: React.FC<TimesheetReviewModalProps> = ({
                         ))
                       )}
                     </tbody>
+                    {boardGroups.length > 0 && (
+                      <tfoot className="border-t-2 border-brand-border/80 bg-brand-surface-low/80 font-semibold text-xs">
+                        <tr>
+                          <td className="py-3 px-4 text-left font-bold text-brand-text flex items-center gap-1.5">
+                            <Clock size={14} className="text-brand-primary" />
+                            <span>DAILY TOTAL</span>
+                          </td>
+                          {dayTotals.map((hrs, idx) => {
+                            const isOverMax = hrs > (effectivePolicy.max_hours_per_day || 24);
+                            const isOverStd = hrs > (effectivePolicy.standard_hours_per_day || 8);
+                            return (
+                              <td key={idx} className="py-3 px-2 text-center font-mono font-bold">
+                                <span
+                                  className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
+                                    hrs === 0
+                                      ? 'text-brand-text-muted/40'
+                                      : isOverMax
+                                        ? 'bg-red-500/20 text-red-400 border border-red-500/40'
+                                        : isOverStd
+                                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                          : 'bg-brand-primary/10 text-brand-primary border border-brand-primary/20'
+                                  }`}
+                                >
+                                  {hrs > 0 ? `${hrs.toFixed(1)}h` : '0h'}
+                                </span>
+                              </td>
+                            );
+                          })}
+                          <td className="py-3 px-4 text-right font-mono font-bold text-brand-primary text-sm">
+                            {totalHours.toFixed(1)} hrs
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
                   </table>
                 </div>
               </div>

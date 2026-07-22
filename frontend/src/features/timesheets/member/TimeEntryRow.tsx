@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MessageSquare, Trash2 } from "lucide-react";
+import { MessageSquare, Trash2, Pencil, X } from "lucide-react";
 import type { TimesheetEntry } from "../../../services/timesheetService";
 import type { TimesheetPolicy } from "../../../services/timesheetAdminService";
 import { Badge } from "../../../components/ui/Badge";
@@ -15,6 +15,8 @@ export interface TimeEntryRowProps {
   onHoursChange: (date: Date, hours: number) => void;
   onDescriptionChange: (date: Date, description: string) => void;
   onDelete: (entryId: string) => void;
+  onDeleteRow?: () => void;
+  onEditEntry?: (entry: TimesheetEntry) => void;
 }
 
 const formatDateKey = (date: Date): string => {
@@ -35,6 +37,8 @@ export const TimeEntryRow: React.FC<TimeEntryRowProps> = ({
   onHoursChange,
   onDescriptionChange,
   onDelete,
+  onDeleteRow,
+  onEditEntry,
 }) => {
   const [activeNoteDateKey, setActiveNoteDateKey] = useState<string | null>(
     null,
@@ -43,7 +47,6 @@ export const TimeEntryRow: React.FC<TimeEntryRowProps> = ({
   // Map entries by date key for quick lookup
   const entryMap = new Map<string, TimesheetEntry>();
   entries.forEach((e) => {
-    // entry_date could be string YYYY-MM-DD
     entryMap.set(e.entry_date.split("T")[0], e);
   });
 
@@ -70,29 +73,47 @@ export const TimeEntryRow: React.FC<TimeEntryRowProps> = ({
 
   return (
     <tr className="border-b border-brand-border/40 hover:bg-brand-surface-low/30 transition-colors group">
-      {/* Left column: Board badge + task name */}
+      {/* Left column: Board badge + task name + row actions */}
       <td className="py-3 px-4 min-w-[220px] max-w-[280px]">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2.5 h-2.5 rounded-full shrink-0 ${getEntryTypeColor(entryType)}`}
-            />
-            <span className="text-xs font-semibold text-brand-text truncate">
-              {boardName}
-            </span>
-            {entryType !== "task" && (
-              <Badge
-                variant="outline"
-                size="sm"
-                className="capitalize text-[10px] py-0 px-1.5"
-              >
-                {entryType}
-              </Badge>
-            )}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${getEntryTypeColor(entryType)}`}
+              />
+              <span className="text-xs font-bold text-brand-text truncate">
+                {boardName}
+              </span>
+              {entryType !== "task" && (
+                <Badge
+                  variant="outline"
+                  size="sm"
+                  className="capitalize text-[10px] py-0 px-1.5"
+                >
+                  {entryType}
+                </Badge>
+              )}
+            </div>
+            <div className="text-[11px] text-brand-text-muted truncate pl-3.5">
+              - {taskTitle || (entryType !== "task" ? entryType : `General / ${boardName}`)}
+            </div>
           </div>
-          <div className="text-xs text-brand-text-muted truncate pl-4">
-            {taskTitle || `General / ${boardName}`}
-          </div>
+
+          {/* Row actions on hover */}
+          {!readOnly && (
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 shrink-0">
+              {onDeleteRow && (
+                <button
+                  type="button"
+                  onClick={onDeleteRow}
+                  className="p-1 text-brand-text-muted hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                  title="Delete row"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </td>
 
@@ -150,22 +171,48 @@ export const TimeEntryRow: React.FC<TimeEntryRowProps> = ({
                   }`}
                 />
 
-                {/* Description indicator & popover trigger button */}
+                {/* Clear cell button when hours > 0 */}
+                {hours > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (entry?.id && !entry.id.startsWith("temp_")) {
+                        onDelete(entry.id);
+                      } else {
+                        onHoursChange(date, 0);
+                      }
+                    }}
+                    className="absolute -top-1 -right-1 opacity-0 group-hover/cell:opacity-100 bg-red-500 text-white rounded-full p-0.5 shadow transition-opacity hover:bg-red-600"
+                    title="Delete cell entry"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+
+                {/* Edit modal or note trigger */}
                 <button
                   type="button"
-                  onClick={() =>
-                    setActiveNoteDateKey(
-                      activeNoteDateKey === dateKey ? null : dateKey,
-                    )
-                  }
-                  className={`absolute top-0.5 right-0.5 p-0.5 rounded transition-opacity ${
+                  onClick={() => {
+                    if (entry && onEditEntry) {
+                      onEditEntry(entry);
+                    } else {
+                      setActiveNoteDateKey(
+                        activeNoteDateKey === dateKey ? null : dateKey,
+                      );
+                    }
+                  }}
+                  className={`absolute top-0.5 left-0.5 p-0.5 rounded transition-opacity ${
                     hasDescription
                       ? "text-brand-primary opacity-100"
                       : "text-brand-text-muted opacity-0 group-hover/cell:opacity-100 hover:text-brand-text"
                   }`}
-                  title={entry?.description || "Add note"}
+                  title={entry?.description || "Edit / Add note"}
                 >
-                  <MessageSquare size={10} />
+                  {entry && onEditEntry ? (
+                    <Pencil size={9} />
+                  ) : (
+                    <MessageSquare size={9} />
+                  )}
                 </button>
 
                 {/* Inline Description Popover */}
@@ -182,10 +229,10 @@ export const TimeEntryRow: React.FC<TimeEntryRowProps> = ({
                             onDelete(entry.id);
                             setActiveNoteDateKey(null);
                           }}
-                          className="text-red-400 hover:text-red-300 p-0.5"
+                          className="text-red-400 hover:text-red-300 p-0.5 flex items-center gap-1 text-[10px]"
                           title="Delete entry"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={12} /> Delete
                         </button>
                       )}
                     </div>

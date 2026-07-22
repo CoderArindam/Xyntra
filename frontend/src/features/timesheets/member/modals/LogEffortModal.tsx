@@ -3,8 +3,10 @@ import { Loader2 } from 'lucide-react';
 import { type Board } from '../../../../services/boardsApi';
 import { type Task } from '../../../../services/tasksApi';
 import { ENTRY_TYPE_OPTIONS } from '../../shared/types';
+import { toDateStr } from '../../shared/utils';
 import { Button } from '../../../../components/ui/Button';
 import { Modal } from '../../../../components/common/Modal';
+import { TaskSearchSelector } from '../../shared/TaskSearchSelector';
 
 interface LogEffortModalProps {
   isOpen: boolean;
@@ -90,25 +92,18 @@ export const LogEffortModal: React.FC<LogEffortModalProps> = ({
       {entryType === 'task' && boardId !== 'general' && (
         <div>
           <label className="block text-xs font-semibold text-brand-text mb-1">
-            Select Task * (Belonging to Selected Board)
+            Select Task * (Assigned to You on Selected Board)
           </label>
-          {loadingTasks ? (
-            <div className="flex items-center gap-2 text-xs text-brand-text-muted py-2">
-              <Loader2 size={14} className="animate-spin text-brand-primary" /> Loading board tasks...
-            </div>
-          ) : (
-            <select
-              value={taskId}
-              onChange={(e) => onTaskChange(e.target.value)}
-              className="w-full bg-brand-surface border border-brand-border rounded-lg px-3 py-2 text-sm text-brand-text focus:outline-none focus:border-brand-primary"
-            >
-              <option value="">-- General Board Work (No Task Linked) --</option>
-              {(boardTasksMap[boardId] || []).map((t) => (
-                <option key={t.id} value={String(t.id)}>
-                  {t.task_reference} - {t.title}
-                </option>
-              ))}
-            </select>
+          <TaskSearchSelector
+            value={taskId}
+            boardId={boardId}
+            onChange={(tId) => onTaskChange(tId)}
+            placeholder="Search tasks assigned to you on this board..."
+          />
+          {!taskId && (
+            <p className="text-[11px] text-amber-500 mt-1 font-medium">
+              * Please select a task assigned to you to log effort.
+            </p>
           )}
         </div>
       )}
@@ -123,7 +118,7 @@ export const LogEffortModal: React.FC<LogEffortModalProps> = ({
             className="w-full bg-brand-surface border border-brand-border rounded-lg px-3 py-2 text-sm text-brand-text focus:outline-none focus:border-brand-primary"
           >
             {weekDates.map((d) => {
-              const dStr = d.toISOString().split('T')[0];
+              const dStr = toDateStr(d);
               const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
               return <option key={dStr} value={dStr}>{label}</option>;
             })}
@@ -166,8 +161,8 @@ export const LogEffortModal: React.FC<LogEffortModalProps> = ({
           variant="primary"
           size="sm"
           onClick={onSave}
-          disabled={parseFloat(hours) <= 0}
-          className="bg-brand-primary hover:bg-brand-primary-hover text-white font-semibold cursor-pointer"
+          disabled={parseFloat(hours) <= 0 || (entryType === 'task' && boardId !== 'general' && !taskId)}
+          className="bg-brand-primary hover:bg-brand-primary-hover text-white font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Save Effort Entry
         </Button>

@@ -393,39 +393,24 @@ RETURNS BOOLEAN AS $$
 DECLARE
     v_org_id UUID;
     v_ts_approver_id UUID;
-    v_user_role TEXT;
 BEGIN
     SELECT org_id, approver_id INTO v_org_id, v_ts_approver_id FROM timesheets WHERE id = p_timesheet_id;
     IF v_org_id IS NULL THEN
         RETURN false;
     END IF;
 
-    -- (a) Superadmin in the organization can approve any timesheet
-    SELECT role::TEXT INTO v_user_role
-    FROM users
-    WHERE (id::text = p_user_id::text OR id::text = LTRIM(RIGHT(p_user_id::text, 12), '0') OR email = p_user_id::text) AND deleted_at IS NULL;
-
-    IF v_user_role IN ('SUPER_ADMIN', 'superadmin') THEN
-        RETURN true;
+    -- If explicitly submitted to a target approver, strictly require matching user_id
+    IF v_ts_approver_id IS NOT NULL THEN
+        RETURN (v_ts_approver_id::text = p_user_id::text OR LTRIM(RIGHT(v_ts_approver_id::text, 12), '0') = LTRIM(RIGHT(p_user_id::text, 12), '0'));
     END IF;
 
-    -- (b) Manager can approve if timesheet is assigned directly to them OR if unassigned and manager is an active designated approver
-    IF v_user_role IN ('MANAGER', 'manager') THEN
-        IF v_ts_approver_id IS NOT NULL AND (v_ts_approver_id::text = p_user_id::text OR LTRIM(RIGHT(v_ts_approver_id::text, 12), '0') = LTRIM(RIGHT(p_user_id::text, 12), '0')) THEN
-            RETURN true;
-        END IF;
-
-        IF v_ts_approver_id IS NULL AND EXISTS (
-            SELECT 1 FROM timesheet_approver_assignments
-            WHERE org_id = v_org_id
-              AND (approver_user_id::text = p_user_id::text OR LTRIM(RIGHT(approver_user_id::text, 12), '0') = LTRIM(RIGHT(p_user_id::text, 12), '0'))
-              AND is_active = true
-        ) THEN
-            RETURN true;
-        END IF;
-    END IF;
-
-    RETURN false;
+    -- If unassigned (approver_id IS NULL), allow active designated approvers in org
+    RETURN EXISTS (
+        SELECT 1 FROM timesheet_approver_assignments
+        WHERE org_id = v_org_id
+          AND (approver_user_id::text = p_user_id::text OR LTRIM(RIGHT(approver_user_id::text, 12), '0') = LTRIM(RIGHT(p_user_id::text, 12), '0'))
+          AND is_active = true
+    );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

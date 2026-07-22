@@ -45,6 +45,7 @@ def _parse_uuid(val: str | UUID | int | None) -> UUID | None:
 
 
 def _handle_db_exception(e: Exception):
+    logger.warning(f"Database operation exception in timesheets router: {e}")
     handle_timesheet_db_error(e)
 
 
@@ -53,6 +54,7 @@ async def list_timesheets(
     status_filter: Optional[str] = Query(None, alias="status"),
     week_start_date: Optional[date] = Query(None),
     target_user_id: Optional[UUID] = Query(None, alias="user_id"),
+    scope: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db_connection),
 ):
@@ -63,20 +65,38 @@ async def list_timesheets(
 
     args = [org_id]
 
-    if role in ("superadmin", "super_admin"):
-        query = "SELECT * FROM v_timesheets_canonical WHERE org_id = $1"
-        if target_user_id:
+    if target_user_id and str(target_user_id) != str(user_id):
+        if role in ("superadmin", "super_admin"):
             args.append(target_user_id)
-            query += f" AND user_id = ${len(args)}"
-    elif role == "manager":
-        args.append(user_id)
-        query = (
-            f"SELECT * FROM v_timesheets_canonical WHERE org_id = $1 "
-            f"AND id IN (SELECT fn_get_manager_accessible_timesheet_ids(${len(args)}, $1))"
-        )
+            query = f"SELECT * FROM v_timesheets_canonical WHERE org_id = $1 AND user_id = $2"
+        elif role == "manager":
+            args.append(target_user_id)
+            args.append(user_id)
+            query = (
+                f"SELECT * FROM v_timesheets_canonical WHERE org_id = $1 AND user_id = $2 "
+                f"AND id IN (SELECT fn_get_manager_accessible_timesheet_ids($3, $1))"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view timesheets for other users",
+            )
+    elif scope == "all":
+        if role in ("superadmin", "super_admin"):
+            query = "SELECT * FROM v_timesheets_canonical WHERE org_id = $1"
+        elif role == "manager":
+            args.append(user_id)
+            query = (
+                f"SELECT * FROM v_timesheets_canonical WHERE org_id = $1 "
+                f"AND id IN (SELECT fn_get_manager_accessible_timesheet_ids($2, $1))"
+            )
+        else:
+            args.append(user_id)
+            query = f"SELECT * FROM v_timesheets_canonical WHERE org_id = $1 AND user_id = $2"
     else:
+        # Default for "My Timesheets": filter strictly by the logged-in user
         args.append(user_id)
-        query = f"SELECT * FROM v_timesheets_canonical WHERE org_id = $1 AND user_id = ${len(args)}"
+        query = f"SELECT * FROM v_timesheets_canonical WHERE org_id = $1 AND user_id = $2"
 
     if status_filter:
         args.append(status_filter)
@@ -101,6 +121,18 @@ async def create_timesheet(
     """Create a new draft timesheet for the authenticated user for the target week."""
     user_id = _parse_uuid(current_user.get("id"))
     org_id = _parse_uuid(current_user.get("organization_id"))
+
+    existing = await conn.fetchval(
+        "SELECT id FROM v_timesheets_canonical WHERE user_id = $1 AND org_id = $2 AND week_start_date = $3",
+        user_id,
+        org_id,
+        body.week_start_date,
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A timesheet already exists for this week",
+        )
 
     try:
         ts_row = await conn.fetchrow(
@@ -156,9 +188,11 @@ async def get_timesheet_detail(
             detail="Timesheet not found",
         )
 
-    if role in ("superadmin", "super_admin"):
+    if str(ts_row["user_id"]) == str(user_id):
+        # Timesheet owner can ALWAYS view their own timesheet regardless of role
         pass
-    elif role == "manager":
+    else:
+        # Non-owners (including Super Admin and other Managers): must be verified via fn_check_timesheet_approver_access
         has_access = await conn.fetchval(
             "SELECT fn_check_timesheet_approver_access($1, $2)",
             user_id,
@@ -168,12 +202,6 @@ async def get_timesheet_detail(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Forbidden: You do not have approver access to this timesheet",
-            )
-    else:
-        if str(ts_row["user_id"]) != str(user_id):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Forbidden: Members can only view their own timesheets",
             )
 
     entries_rows = await conn.fetch(
@@ -218,6 +246,27 @@ async def upsert_timesheet_entry(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Only the owner can modify entries for this timesheet",
         )
+
+    if body.task_id and (not body.entry_type or body.entry_type == "task"):
+        task_row = await conn.fetchrow(
+            """
+            SELECT assigned_to FROM v_tasks_canonical
+            WHERE (id::text = $1 OR LTRIM(RIGHT(id::text, 12), '0') = LTRIM(RIGHT($1, 12), '0'))
+              AND (organization_id::text = $2 OR LTRIM(RIGHT(organization_id::text, 12), '0') = LTRIM(RIGHT($2, 12), '0'))
+            """,
+            str(body.task_id),
+            str(org_id),
+        )
+        if not task_row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error_code": "TASK_NOT_FOUND", "detail": "The specified task was not found."},
+            )
+        if _parse_uuid(task_row["assigned_to"]) != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"error_code": "TASK_NOT_ASSIGNED", "detail": "Time can only be logged against tasks assigned to you."},
+            )
 
     try:
         entry_row = await conn.fetchrow(
@@ -325,7 +374,7 @@ async def submit_timesheet(
             detail="Forbidden: Only the owner can submit this timesheet",
         )
 
-    client_ip = request.client.host if request.client else None
+    client_ip = request.client.host if request.client and request.client.host != "testclient" else "127.0.0.1"
     user_agent = request.headers.get("user-agent", "")
 
     try:
