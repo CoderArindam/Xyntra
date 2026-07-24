@@ -257,5 +257,3 @@ async def notify_timesheet_recalled(conn: asyncpg.Connection, timesheet_id, subm
     except Exception as e:
         logger.error(f"Failed to create timesheet recalled notification: {e}")
         return None
-
-

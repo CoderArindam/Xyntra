@@ -7,9 +7,6 @@ from app.database.connection import get_db_connection
 router = APIRouter(prefix="/organization", tags=["Organization"])
 
 
-def get_organization_service(conn = Depends(get_db_connection)) -> OrganizationService:
-    return OrganizationService(conn)
-
 def get_org_service(conn = Depends(get_db_connection)) -> OrganizationService:
     return OrganizationService(conn)
 

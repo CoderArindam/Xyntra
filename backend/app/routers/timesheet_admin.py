@@ -18,7 +18,7 @@ from app.schemas.timesheet_admin import (
     TimesheetPolicyResponse,
     TimesheetPolicyUpdateRequest,
 )
-from fastapi import Query, Request
+from fastapi import Query
 
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,6 @@ def _parse_uuid(val: str | uuid.UUID | int | None) -> uuid.UUID | None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid UUID format: {val}"
         )
-
 
 
 def _check_superadmin(current_user: dict):

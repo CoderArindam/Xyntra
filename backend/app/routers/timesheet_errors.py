@@ -1,7 +1,6 @@
 import logging
 from typing import Dict, Tuple
 from fastapi import HTTPException, status
-import asyncpg.exceptions
 
 logger = logging.getLogger(__name__)
 

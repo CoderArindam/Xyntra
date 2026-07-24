@@ -1,5 +1,4 @@
 import logging
-import uuid
 from datetime import date
 from typing import List, Optional
 from uuid import UUID
@@ -41,7 +40,6 @@ def _parse_uuid(val: str | UUID | int | None) -> UUID | None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid UUID format: {val}",
         )
-
 
 
 def _handle_db_exception(e: Exception):

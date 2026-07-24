@@ -7,9 +7,6 @@ from app.database.connection import get_db_connection
 router = APIRouter(prefix="/users/me/preferences", tags=["Preferences"])
 
 
-def get_preferences_service(conn = Depends(get_db_connection)) -> PreferencesService:
-    return PreferencesService(conn)
-
 def get_pref_service(conn = Depends(get_db_connection)) -> PreferencesService:
     return PreferencesService(conn)
 

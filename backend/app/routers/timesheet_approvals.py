@@ -39,7 +39,6 @@ def _parse_uuid(val: str | UUID | int | None) -> UUID | None:
         )
 
 
-
 def _check_superadmin_or_manager(current_user: dict):
     role = str(current_user.get("role") or "").lower()
     if role not in ("superadmin", "super_admin", "manager"):
@@ -67,10 +66,6 @@ async def get_approval_queue(
     _check_superadmin_or_manager(current_user)
     user_id = _parse_uuid(current_user.get("id"))
     org_id = _parse_uuid(current_user.get("organization_id"))
-    s_user_id = str(user_id)
-    s_org_id = str(org_id)
-    role = str(current_user.get("role") or "").lower()
-    is_admin = role in ("superadmin", "super_admin")
 
     base_where = "WHERE org_id = $1 AND (approver_id = $2 OR approver_id IS NULL) AND user_id != $2"
     params = [org_id, user_id]
@@ -125,10 +120,6 @@ async def get_approval_queue_summary(
     _check_superadmin_or_manager(current_user)
     user_id = _parse_uuid(current_user.get("id"))
     org_id = _parse_uuid(current_user.get("organization_id"))
-    s_user_id = str(user_id)
-    s_org_id = str(org_id)
-    role = str(current_user.get("role") or "").lower()
-    is_admin = role in ("superadmin", "super_admin")
 
     where_clause = "WHERE org_id = $1 AND (approver_id = $2 OR approver_id IS NULL) AND user_id != $2"
     params = [org_id, user_id]
@@ -171,8 +162,6 @@ async def approve_timesheet(
     _check_superadmin_or_manager(current_user)
     user_id = _parse_uuid(current_user.get("id"))
     org_id = _parse_uuid(current_user.get("organization_id"))
-    role = str(current_user.get("role") or "").lower()
-    is_admin = role in ("superadmin", "super_admin")
 
     has_access = await conn.fetchval(
         "SELECT fn_check_timesheet_approver_access($1, $2)",
@@ -235,8 +224,6 @@ async def reject_timesheet(
     _check_superadmin_or_manager(current_user)
     user_id = _parse_uuid(current_user.get("id"))
     org_id = _parse_uuid(current_user.get("organization_id"))
-    role = str(current_user.get("role") or "").lower()
-    is_admin = role in ("superadmin", "super_admin")
 
     if not body.comment or not body.comment.strip():
         raise HTTPException(

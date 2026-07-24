@@ -1,6 +1,6 @@
 from app.database.connection import get_db_connection
 from fastapi import APIRouter, Depends
-from typing import List
+
 from app.auth.dependencies import get_current_user
 from app.schemas.envelope import DataEnvelope
 from app.services.board_service import BoardService
