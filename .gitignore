@@ -122,7 +122,6 @@ temp/
 .cache/
 coverage/
 .agents/
-docs/
 /backend/storage/meeting
 /backend/tests
 /experiments
