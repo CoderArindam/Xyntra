@@ -149,7 +149,7 @@ Manages startup and shutdown hooks using `asynccontextmanager`:
 ### 4.4 Meeting Subsystem (`app/meeting/`)
 The meeting subsystem is self-contained and modular:
 - `api/router.py`: Exposes endpoints for managing meeting sessions.
-- `bot/recorder/recorder.py`: `MeetingRecorder` manages Playwright page injection and WebM stream assembly.
+- `bot/recorder/recorder.py`: `MeetingRecorder` manages PulseAudio audio capture via an FFmpeg subprocess and WebM stream assembly.
 - `pipeline/orchestrator.py`: `MeetingPipelineOrchestrator` controls sequential execution of meeting stages.
 - `services/meeting_service.py`: `MeetingService` maintains active runtime instances (`MeetingRuntime`) and background tasks.
 
@@ -196,7 +196,7 @@ sequenceDiagram
 | `Settings` | `app/config/settings.py` | Config | pydantic-settings env config (`DATABASE_URL`, `JWT_SECRET`, `JWT_ALGORITHM`, `SMTP_*`, `FRONTEND_ORIGINS`) |
 | `MeetingService` | `app/meeting/services/meeting_service.py` | Service | Global registry and manager of active meeting runtimes |
 | `MeetingRuntime` | `app/meeting/services/meeting_service.py` | Domain | Container for session state, Playwright browser, event bus |
-| `MeetingRecorder` | `app/meeting/bot/recorder/recorder.py` | Bot Engine | MediaRecorder script injection & WebM recording assembly |
+| `MeetingRecorder` | `app/meeting/bot/recorder/recorder.py` | Bot Engine | PulseAudio audio capture & WebM recording assembly via FFmpeg |
 | `MeetingPipelineOrchestrator` | `app/meeting/pipeline/orchestrator.py` | Orchestration | Sequential stage execution engine for post-processing |
 | `PipelineContext` | `app/meeting/pipeline/context.py` | Domain Context | State context passed between pipeline stages containing artifacts |
 | `DeepgramSpeechProvider` | `app/meeting/providers/speech/deepgram_provider.py` | Provider | Deepgram Nova-3 API client for STT and atomic diarization |

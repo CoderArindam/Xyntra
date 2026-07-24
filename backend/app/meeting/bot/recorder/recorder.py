@@ -1,25 +1,23 @@
-"""MeetingRecorder — browser tab audio capture using injected MediaRecorder.
+"""MeetingRecorder — browser audio capture using Linux Audio Subsystem (PulseAudio/PipeWire) and FFmpeg.
 
-Captures all meeting participant audio via a JavaScript MediaRecorder injected
-into the Playwright page. Audio chunks are streamed back to Python via
-page.expose_function. On stop(), the recording is persisted and returned
-as a MeetingRecording artifact.
+Captures system/browser audio output directly via FFmpeg reading from PulseAudio/PipeWire.
+On stop(), the FFmpeg process is gracefully stopped via SIGINT, and the recording is
+persisted and returned as a MeetingRecording artifact.
 """
 
 from __future__ import annotations
 
 import asyncio
-import base64
 import os
+import signal
 import tempfile
 import time
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 from app.meeting.artifacts.recording import MeetingRecording
-from app.meeting.bot.recorder.capture_script import CAPTURE_SCRIPT
 from app.meeting.config import meeting_config
 from app.meeting.exceptions import RecordingInitError, RecordingWriteError
 from app.meeting.logger import get_logger
@@ -51,7 +49,7 @@ class RecorderState(str, Enum):
 # ------------------------------------------------------------------ #
 
 class MeetingRecorder:
-    """Single-owner component for meeting audio capture lifecycle."""
+    """Single-owner component for meeting audio capture lifecycle via FFmpeg."""
 
     def __init__(self, storage: RecordingStorage) -> None:
         self._storage = storage
@@ -60,10 +58,9 @@ class MeetingRecorder:
         self._session_id: str | None = None
         self._meeting_id: str | None = None
 
-        # WebM Buffer management
-        self._buffer = bytearray()
-        self._temp_files: list[str] = []
-        self._buffer_lock = asyncio.Lock()
+        # FFmpeg process management
+        self._process: asyncio.subprocess.Process | None = None
+        self._temp_output_path: str | None = None
 
         # Timing
         self._start_time: float | None = None
@@ -71,11 +68,9 @@ class MeetingRecorder:
         self._start_dt: datetime | None = None
         self._end_dt: datetime | None = None
 
-        # Result
+        # Metadata
         self._mime_type: str = "audio/webm;codecs=opus"
         self._artifact: MeetingRecording | None = None
-
-        self._stop_event = asyncio.Event()
 
     @property
     def state(self) -> RecorderState:
@@ -86,9 +81,9 @@ class MeetingRecorder:
         return self._state == RecorderState.RECORDING
 
     async def initialize(self, page: Any, session_id: str, meeting_id: str | None = None) -> None:
-        """Inject the capture script and register chunk callbacks.
+        """Prepare recorder for session.
 
-        Must be called before start(). Failures set state to FAILED.
+        Must be called before start(). Maintained for signature & lifecycle compatibility.
         """
         if self._state != RecorderState.IDLE:
             return
@@ -101,29 +96,14 @@ class MeetingRecorder:
         log.info("recording.initializing", session_id=session_id)
 
         try:
-            # Register chunk callback BEFORE injecting script
-            await page.expose_function("_kaioRecordingChunk", self._on_chunk)
-
-            # Inject the capture script
-            await page.evaluate(CAPTURE_SCRIPT)
-
-            # Verify installation
-            status = await page.evaluate("window._kaioRecordingStatus ? window._kaioRecordingStatus() : 'not_installed'")
-            if status == "not_installed":
-                raise RecordingInitError("Audio capture script failed to install in page context")
-
             self._state = RecorderState.READY
-            log.info("recording.initialized", session_id=session_id, page_status=status)
-
-        except RecordingInitError:
-            self._state = RecorderState.FAILED
-            raise
+            log.info("recording.initialized", session_id=session_id)
         except Exception as exc:
             self._state = RecorderState.FAILED
             raise RecordingInitError(f"Recorder initialization failed: {exc}") from exc
 
     async def start(self) -> None:
-        """Signal the injected JS to begin recording."""
+        """Spawn FFmpeg process to capture browser/system audio from PulseAudio."""
         if self._state != RecorderState.READY:
             log.warning(
                 "recording.start.skipped",
@@ -133,41 +113,55 @@ class MeetingRecorder:
             return
 
         try:
-            result = await self._page.evaluate(
-                f"window._kaioStartRecording('{self._mime_type}', 1000)"
-            )
-            if not result.get("ok"):
-                error = result.get("error", "unknown")
-                raise RecordingInitError(f"JS recorder start failed: {error}")
+            fd, tmp_path = tempfile.mkstemp(suffix=".webm", prefix="kaio_rec_")
+            os.close(fd)
+            self._temp_output_path = tmp_path
 
-            actual_mime = result.get("mimeType", self._mime_type)
-            self._mime_type = actual_mime
+            import sys
+            pulse_source = getattr(meeting_config, "RECORDING_PULSE_SOURCE", "default")
+            
+            if sys.platform == "win32":
+                win_device = getattr(meeting_config, "RECORDING_WIN_AUDIO_DEVICE", "")
+                if win_device:
+                    audio_input = ["-f", "dshow", "-i", f"audio={win_device}"]
+                else:
+                    audio_input = ["-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000"]
+            else:
+                audio_input = ["-f", "pulse", "-i", pulse_source]
+
+            cmd = [
+                meeting_config.FFMPEG_PATH,
+                "-y",
+                *audio_input,
+                "-acodec", "libopus",
+                "-ar", str(meeting_config.RECORDING_SAMPLE_RATE),
+                "-ac", "2",
+                "-b:a", "128k",
+                "-f", "webm",
+                self._temp_output_path,
+            ]
+
+            log.info("recording.ffmpeg.starting", session_id=self._session_id, pulse_source=pulse_source, platform=sys.platform, output=self._temp_output_path)
+
+            self._process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
 
             self._start_time = time.monotonic()
             self._start_dt = datetime.now(timezone.utc)
             self._state = RecorderState.RECORDING
 
-            log.info(
-                "recording.started",
-                session_id=self._session_id,
-                mime_type=actual_mime,
-                display_surface=result.get("displaySurface"),
-                logical_surface=result.get("logicalSurface"),
-                cursor=result.get("cursor"),
-                audio_tracks=len(result.get("audioTracks") or []),
-                video_tracks=len(result.get("videoTracks") or []),
-            )
+            log.info("recording.started", session_id=self._session_id, pid=self._process.pid)
 
-        except RecordingInitError:
-            self._state = RecorderState.FAILED
-            raise
         except Exception as exc:
             self._state = RecorderState.FAILED
             log.error("recording.start.failed", session_id=self._session_id, error=str(exc))
-            raise RecordingInitError(f"Failed to start recording: {exc}") from exc
+            raise RecordingInitError(f"Failed to start FFmpeg recording process: {exc}") from exc
 
     async def stop(self) -> MeetingRecording | None:
-        """Stop the recording, persist the audio, decode, run phase 0X verification, and return artifact."""
+        """Stop FFmpeg process gracefully, read WebM audio, persist artifact, and return."""
         if self._state not in (RecorderState.RECORDING, RecorderState.READY):
             log.info(
                 "recording.stop.skipped",
@@ -183,26 +177,39 @@ class MeetingRecorder:
         log.info("recording.stopping", session_id=self._session_id)
 
         try:
-            # Signal JS to stop and flush final chunks
-            result = await self._page.evaluate("window._kaioStopRecording()")
-            if not result.get("ok"):
-                log.warning(
-                    "recording.stop.js_error",
-                    session_id=self._session_id,
-                    error=result.get("error"),
-                )
+            if self._process and self._process.returncode is None:
+                try:
+                    import sys
+                    if sys.platform != "win32" and hasattr(signal, "SIGINT"):
+                        self._process.send_signal(signal.SIGINT)
+                    else:
+                        self._process.terminate()
+                    await asyncio.wait_for(self._process.wait(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    log.warning("recording.ffmpeg.stop_timeout", session_id=self._session_id)
+                    try:
+                        self._process.terminate()
+                        await asyncio.wait_for(self._process.wait(), timeout=2.0)
+                    except Exception:
+                        self._process.kill()
+                except Exception as exc:
+                    log.warning("recording.ffmpeg.stop_error", session_id=self._session_id, error=str(exc))
+                    try:
+                        self._process.kill()
+                    except Exception:
+                        pass
 
-            # Give JS a moment to deliver final callbacks
-            await asyncio.sleep(0.5)
+            if not self._temp_output_path or not Path(self._temp_output_path).exists():
+                log.warning("recording.stop.no_file", session_id=self._session_id)
+                self._state = RecorderState.FAILED
+                return None
 
-            # Assemble WebM data
-            audio_data = await self._assemble_audio()
+            audio_data = Path(self._temp_output_path).read_bytes()
             if not audio_data:
                 log.warning("recording.stop.no_data", session_id=self._session_id)
                 self._state = RecorderState.FAILED
                 return None
 
-            # Persist WebM recording
             artifact = await self._persist(audio_data)
             self._artifact = artifact
 
@@ -222,99 +229,48 @@ class MeetingRecorder:
             return None
 
     async def cancel(self) -> None:
-        """Abort recording immediately. Discards all buffered data."""
+        """Abort recording immediately. Terminate FFmpeg process and discard data."""
         if self._state in (RecorderState.COMPLETED, RecorderState.CANCELLED):
             return
 
         log.info("recording.cancelled", session_id=self._session_id, state=self._state.value)
         self._state = RecorderState.CANCELLED
 
-        try:
-            await asyncio.wait_for(
-                self._page.evaluate("window._kaioStopRecording()"),
-                timeout=2.0,
-            )
-        except Exception:
-            pass
+        if self._process and self._process.returncode is None:
+            try:
+                self._process.terminate()
+                await asyncio.wait_for(self._process.wait(), timeout=2.0)
+            except Exception:
+                try:
+                    self._process.kill()
+                except Exception:
+                    pass
 
         await self.cleanup()
 
     async def cleanup(self) -> None:
-        """Idempotent cleanup. Removes temp files and clears buffers."""
+        """Idempotent cleanup. Removes temporary file artifacts."""
         log.info("recording.cleanup.started", session_id=self._session_id)
-        removed = 0
 
-        async with self._buffer_lock:
-            self._buffer.clear()
-
-        for tmp in list(self._temp_files):
+        if self._temp_output_path:
             try:
-                Path(tmp).unlink(missing_ok=True)
-                removed += 1
+                Path(self._temp_output_path).unlink(missing_ok=True)
             except OSError as exc:
-                log.warning("recording.cleanup.temp_delete_failed", path=tmp, error=str(exc))
-        self._temp_files.clear()
+                log.warning("recording.cleanup.temp_delete_failed", path=self._temp_output_path, error=str(exc))
+            self._temp_output_path = None
 
-        log.info(
-            "recording.cleanup.completed",
-            session_id=self._session_id,
-            temp_files_removed=removed,
-        )
+        self._process = None
+        log.info("recording.cleanup.completed", session_id=self._session_id)
 
     # ------------------------------------------------------------------ #
     # Internal                                                             #
     # ------------------------------------------------------------------ #
 
-    async def _on_chunk(self, b64_data: str) -> None:
-        """Playwright expose_function callback for WebM chunk."""
-        try:
-            chunk = base64.b64decode(b64_data)
-            async with self._buffer_lock:
-                self._buffer.extend(chunk)
-                total = len(self._buffer)
-
-            if total >= meeting_config.RECORDING_BUFFER_SIZE:
-                await self._flush_buffer()
-        except Exception as exc:
-            log.warning("recording.chunk.error", session_id=self._session_id, error=str(exc))
-
-    async def _flush_buffer(self) -> None:
-        async with self._buffer_lock:
-            if not self._buffer:
-                return
-            data = bytes(self._buffer)
-            self._buffer.clear()
-
-        try:
-            fd, tmp_path = tempfile.mkstemp(suffix=".part", prefix="kaio_rec_")
-            os.write(fd, data)
-            os.close(fd)
-            self._temp_files.append(tmp_path)
-        except OSError as exc:
-            raise RecordingWriteError(f"Failed to flush recording buffer: {exc}") from exc
-
-    async def _assemble_audio(self) -> bytes:
-        parts: list[bytes] = []
-        for tmp in self._temp_files:
-            try:
-                parts.append(Path(tmp).read_bytes())
-            except OSError as exc:
-                log.warning("recording.assemble.read_failed", path=tmp, error=str(exc))
-
-        async with self._buffer_lock:
-            if self._buffer:
-                parts.append(bytes(self._buffer))
-                self._buffer.clear()
-
-        return b"".join(parts)
-
     async def _persist(self, audio_data: bytes) -> MeetingRecording:
-        fmt = self._mime_type.split("/")[-1].split(";")[0]
-        codec = "opus" if "opus" in self._mime_type else "unknown"
         checksum = compute_sha256(audio_data)
 
         local_path, storage_uri = await self._storage.save(
-            self._session_id, audio_data, fmt
+            self._session_id, audio_data, "webm"
         )
 
         duration = (
@@ -328,10 +284,10 @@ class MeetingRecorder:
             file_path=local_path,
             storage_uri=storage_uri,
             duration_seconds=round(duration, 3),
-            format=fmt,
+            format="webm",
             sample_rate=meeting_config.RECORDING_SAMPLE_RATE,
             channel_count=2,
-            codec=codec,
+            codec="opus",
             mime_type=self._mime_type,
             file_size_bytes=len(audio_data),
             checksum_sha256=checksum,
@@ -339,4 +295,3 @@ class MeetingRecorder:
             recording_end_time=self._end_dt.isoformat() if self._end_dt else "",
             recording_status="completed",
         )
-

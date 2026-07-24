@@ -6,11 +6,11 @@ The KAIO Meeting Pipeline automatically processes live video meetings into speak
 
 ```
 ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
-│   Google Meet   │  ───► │  Playwright Bot │  ───► │ MediaRecorder   │
-│ Live Session    │       │ Browser Join    │       │ WebM Capture    │
+│   Google Meet   │  ───► │  Playwright Bot │  ───► │ PulseAudio/FFmpeg│
+│ Live Session    │       │ Join Only       │       │ Audio Recording │
 └─────────────────┘       └─────────────────┘       └─────────────────┘
-                                                             │
-                                                             ▼
+                                                              │
+                                                              ▼
 ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
 │  Attributed     │  ◄─── │ Speaker         │  ◄─── │ Deepgram        │
 │  Transcript     │       │ Attribution     │       │ STT + Diarize   │
@@ -28,7 +28,7 @@ sequenceDiagram
     participant API as Meeting API Router
     participant Service as MeetingService
     participant Bot as Playwright Bot
-    participant Rec as JS MediaRecorder
+    participant Rec as FFmpeg (PulseAudio)
     participant Orchestrator as Pipeline Orchestrator
     participant Deepgram as Deepgram Nova-3 API
     participant Engine as Dynamic Attribution Engine
@@ -37,11 +37,11 @@ sequenceDiagram
     API->>Service: join_meeting(meet_url)
     Service->>Bot: Launch Chromium & Navigate
     Bot->>Bot: Perform Google Auth / Room Join
-    Bot->>Rec: Inject capture_script.js & start MediaRecorder
+    Bot->>Rec: Spawn FFmpeg recording process (PulseAudio audio capture)
     Note over Bot,Rec: Meeting in Progress (Audio & Presence Collection)
     User->>API: POST /api/v1/meeting/leave
     API->>Service: leave_meeting()
-    Rec-->>Bot: Flush WebM audio chunks
+    Rec-->>Bot: Graceful SIGINT exit & WebM save
     Bot-->>Service: Save storage/meeting/recordings/{session_id}/recording.webm
     Service->>Orchestrator: execute_pipeline(session_id)
     
@@ -111,3 +111,17 @@ Every meeting execution creates a session folder under `backend/storage/meeting/
 | `task_proposals_manifest.json` | `Dict` | Execution record of AI-extracted task proposals |
 | `pipeline_manifest.json` | `Dict` | Execution record of completed pipeline stages |
 | `pipeline_report.json` | `Dict` | Execution timings, metrics, and summary |
+
+---
+
+## 5. Linux VPS Audio Infrastructure & Headless Pipeline
+
+For headless Linux VPS deployments, physical sound cards and displays are absent. The meeting bot utilizes virtual audio loopback and frame buffer servers:
+
+1. **Headless Display (`Xvfb`)**: Spawns virtual X11 frame buffer on display `:99` for Playwright Chromium navigation.
+2. **Virtual Audio Sink (`PulseAudio/PipeWire`)**: Loads virtual `kaio_sink` null-sink module (`pactl load-module module-null-sink sink_name=kaio_sink`).
+3. **Audio Playback Routing**: Sets `kaio_sink` as default output sink so Chromium routes tab playback into the virtual sink.
+4. **Audio Capture Routing**: FFmpeg spawns with `-f pulse -i kaio_sink.monitor` to stream audio directly into WebM format.
+
+> For complete installation scripts, systemd service units, and health checks, see [14 — Linux VPS Meeting Bot Deployment Guide](./14_VPS_MEETING_BOT_DEPLOYMENT.md).
+

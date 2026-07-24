@@ -35,8 +35,8 @@ A chronological log (`ParticipantPresenceTimeline`) recording participant join e
 ### Playwright Bot Controller
 The browser automation layer (`app/meeting/bot/controller/`) that launches Chromium, logs into Google services, navigates to meeting URLs, and accepts meeting permissions.
 
-### MediaRecorder Script
-A custom JavaScript module (`capture_script.js`) injected into the Playwright page context that captures tab audio via Web Audio API and streams WebM chunks back to Python.
+### FFmpeg PulseAudio Recorder
+The audio capture component (`app/meeting/bot/recorder/recorder.py`) that captures Linux Audio Subsystem (PulseAudio/PipeWire) browser output directly via an `ffmpeg` process into WebM Opus format.
 
 ### RBAC (Role-Based Access Control)
 KAIO implements three user roles:

@@ -12,7 +12,8 @@ This directory dictionary maps every major folder across the repository, explain
 |---|---|---|
 | `backend/` | FastAPI Python backend application | `app/main.py`, `.env`, `requirements.txt` |
 | `database/` | PostgreSQL schema migrations & rebuild scripts | `migrations/`, `scripts/rebuild.py` |
-| `docs/` | Architecture documentation suite for AI agents & engineers | `README.md`, `01_PROJECT_OVERVIEW.md` … `13_CHROME_EXTENSION_ARCHITECTURE.md` |
+| `deploy/` | Linux VPS deployment & meeting bot environment scripts | `deploy/vps/install_dependencies.sh`, `start_meeting_bot_env.sh`, `health_check.sh` |
+| `docs/` | Architecture documentation suite for AI agents & engineers | `README.md`, `01_PROJECT_OVERVIEW.md` … `14_VPS_MEETING_BOT_DEPLOYMENT.md` |
 | `extension/` | Manifest V3 Chrome Extension for presence tracking | `manifest.json`, `content/`, `background/` |
 | `frontend/` | React 19 + Vite single-page application | `src/main.tsx`, `vite.config.ts`, `package.json` |
 

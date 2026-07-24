@@ -1,0 +1,33 @@
+[Unit]
+Description=KAIO Meeting Bot Subsystem & FastAPI Backend Service
+After=network.target sound.target
+Wants=sound.target
+
+[Service]
+Type=simple
+User=kaio
+Group=kaio
+WorkingDirectory=/opt/kaio/backend
+Environment="PATH=/opt/kaio/backend/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
+Environment="DISPLAY=:99"
+Environment="PULSE_SERVER=unix:/run/user/1000/pulse/native"
+Environment="RECORDING_PULSE_SOURCE=kaio_sink.monitor"
+Environment="MEETING_HEADLESS=true"
+EnvironmentFile=/opt/kaio/backend/.env
+
+# Environment preparation before main backend service launch
+ExecStartPre=/bin/bash /opt/kaio/deploy/vps/start_meeting_bot_env.sh
+
+# Run FastAPI / Uvicorn server hosting meeting runtime manager
+ExecStart=/opt/kaio/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+
+# Environment cleanup after service termination
+ExecStopPost=/bin/bash /opt/kaio/deploy/vps/stop_meeting_bot_env.sh
+
+Restart=always
+RestartSec=5s
+KillMode=mixed
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=multi-user.target

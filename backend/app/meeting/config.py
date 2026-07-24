@@ -90,6 +90,9 @@ class MeetingSettings(BaseSettings):
     RECORDING_SAMPLE_RATE: int = 48000
     RECORDING_MAX_DURATION: int = 14400      # seconds — 4 hours hard cap
     RECORDING_BUFFER_SIZE: int = 10_485_760  # bytes  — 10 MB in-memory buffer
+    RECORDING_PULSE_SOURCE: str = "default"  # PulseAudio/PipeWire source name
+    RECORDING_WIN_AUDIO_DEVICE: str = ""    # DirectShow audio device name on Windows
+
 
     # ------------------------------------------------------------------ #
     # Audio Processing                                                     #

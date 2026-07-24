@@ -27,12 +27,8 @@ _CHROMIUM_ARGS = [
     "--disable-infobars",
     "--disable-notifications",
     "--start-maximized",
-    "--allow-http-screen-capture",
-    "--enable-usermedia-screen-capturing",
-    "--auto-select-desktop-capture-source=Meet",
-    "--auto-select-tab-capture-source-by-title=Meet",
-    "--auto-select-desktop-capture-source=Google Meet",
-    "--auto-select-tab-capture-source-by-title=Google Meet",
+    "--use-fake-ui-for-media-stream",
+    "--autoplay-policy=no-user-gesture-required",
 ]
 
 

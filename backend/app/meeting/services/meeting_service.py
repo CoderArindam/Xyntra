@@ -880,7 +880,7 @@ class MeetingService:
     async def _empty_meeting_countdown(self, session_id: str, runtime: MeetingRuntime) -> None:
         """Countdown when no humans are present, requesting shutdown if it expires."""
         try:
-            await asyncio.sleep(15)
+            await asyncio.sleep(10)
             log.info(
                 "meeting.empty_timer_expired",
                 session_id=session_id,
@@ -896,6 +896,24 @@ class MeetingService:
             participants = self.get_participants(session_id)
             present_count = sum(1 for p in participants if p.is_present)
             has_human_participants = any(p.is_present and not p.is_bot for p in participants)
+            
+            # Direct Playwright DOM fallback check
+            if runtime.context and getattr(runtime.context, "page", None):
+                try:
+                    from app.meeting.intelligence.dom.participant_dom import ParticipantDOM
+                    from app.meeting.intelligence.dom.meeting_dom import MeetingDOM
+                    from app.meeting.intelligence.models import MeetingState
+                    
+                    dom_participants = await ParticipantDOM().get_raw_participants(runtime.context.page)
+                    human_dom_participants = [p for p in dom_participants if not p.get("is_self")]
+                    if len(human_dom_participants) > 0:
+                        has_human_participants = True
+                    else:
+                        m_state = await MeetingDOM().detect_state(runtime.context.page)
+                        if m_state == MeetingState.EMPTY_POPUP:
+                            has_human_participants = False
+                except Exception:
+                    pass
             
             log.info(
                 "meeting.empty_revalidated",

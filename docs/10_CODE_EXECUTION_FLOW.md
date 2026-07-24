@@ -123,7 +123,7 @@ sequenceDiagram
     Service->>Bot: launch_browser() & navigate(meeting_url)
     Bot->>Bot: Bypass Google Auth & Join Room
     Bot->>Rec: start_recording()
-    Rec->>Rec: Inject capture_script.js & start MediaRecorder
+    Rec->>Rec: Spawn FFmpeg subprocess (PulseAudio capture)
     Rec-->>Service: Recording Active
     Service-->>API: Session ID & Status JOINED
     API-->>User: 200 OK {session_id, status: "JOINED"}
@@ -147,7 +147,7 @@ sequenceDiagram
     User->>API: POST /api/v1/meeting/leave
     API->>Service: leave_meeting(session_id)
     Service->>Rec: stop_recording()
-    Rec->>Rec: Flush WebM byte chunks
+    Rec->>Rec: Graceful SIGINT shutdown & write WebM output
     Rec-->>Service: Save storage/meeting/recordings/{id}/recording.webm
     Service->>Orchestrator: execute_pipeline(session_id)
 

@@ -74,7 +74,7 @@ MEET_SELECTORS: dict[str, str] = {
     "permission_denied":       'text=/Someone in the call denied your request to join/i',
     "network_error":           'text="Can\'t join"',
     "login_required":          'text="Sign in to continue"',
-    "empty_meeting_popup":     'text="No one else"',
+    "empty_meeting_popup":     'text=/No one else|You\'re the only one here|Everyone else has left|You\'re the only person in this call/i',
 
     # ── Participant panel (ParticipantDOM) ────────────────────────────
     # Each row in the participant list OR video tile

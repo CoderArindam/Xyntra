@@ -61,6 +61,7 @@ These are hardcoded in the `set_auth_cookies()` helper and not environment-drive
 | `MEETING_DEEPGRAM_API_KEY` | `str` | **Required** | Cloud API key for Deepgram Nova-3. |
 | `MEETING_DEEPGRAM_MODEL` | `str` | `nova-3` | Deepgram speech model identifier. |
 | `RECORDING_OUTPUT_DIR` | `Path` | `storage/meeting/recordings` | Directory where raw `recording.webm` files are saved. |
+| `RECORDING_PULSE_SOURCE` | `str` | `default` | PulseAudio/PipeWire monitor source name (e.g. `kaio_sink.monitor`). |
 | `PROCESSING_OUTPUT_DIR` | `Path` | `storage/meeting/processed_audio` | Directory for all pipeline output artifacts per session. |
 | `CANONICAL_SAMPLE_RATE` | `int` | `16000` | Target sample rate (Hz) for FFmpeg WAV conversion. |
 | `CANONICAL_CHANNELS` | `int` | `1` | Mono audio channel count for FFmpeg output. |
@@ -69,6 +70,16 @@ These are hardcoded in the `set_auth_cookies()` helper and not environment-drive
 | `EXTRACTION_MAX_RETRIES` | `int` | `3` | Maximum retry attempts for transient LLM task extraction errors. |
 | `EXTRACTION_CHUNK_TOKEN_LIMIT` | `int` | `4000` | Maximum token window per transcript chunk sent to LLM. |
 | `EXTRACTION_MIN_TRANSCRIPT_WORDS` | `int` | `20` | Minimum word count threshold before LLM extraction runs (avoids empty meeting extraction). |
+
+### 4.1 Linux VPS Audio Environment Variables
+
+When running in Linux VPS environments (managed via `deploy/vps/start_meeting_bot_env.sh` or `kaio-meeting-bot.service`):
+
+| Variable Key | System Default | Purpose |
+|---|---|---|
+| `DISPLAY` | `:99` | Connects Playwright Chromium browser to Xvfb virtual frame buffer |
+| `PULSE_SERVER` | `unix:/run/user/$UID/pulse/native` | Directs audio streams to active PulseAudio / PipeWire daemon |
+| `MEETING_RECORDING_PULSE_SOURCE` | `kaio_sink.monitor` | Forces FFmpeg audio capture from `kaio_sink` monitor source |
 
 ---
 
